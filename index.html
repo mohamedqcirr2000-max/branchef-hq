@@ -304,6 +304,7 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
+        <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;" title="Sign out">↩ Logout</button>
       </div>
     </div>
     <div class="content" id="content"></div>
@@ -604,7 +605,16 @@ function refreshCurrentPage(){
 function renderDashboard(){
   var h=new Date().getHours();
   var g=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  var myRest=CU.role==='owner'?restaurants.filter(function(r){return r.status!=='live';}):restaurants.filter(function(r){return r.agent===CU.name&&r.status!=='live';});
+  // Show restaurants where it's MY turn (current step assigned to me) OR I'm the agent
+  var myRest=CU.role==='owner'
+    ?restaurants.filter(function(r){return r.status!=='live';})
+    :restaurants.filter(function(r){
+        if(r.status==='live')return false;
+        var step=r.stepIndex||0;
+        var stepDef=STEPS[step];
+        // Show if current step is mine OR I'm the agent
+        return (stepDef&&stepDef.who===CU.name)||(r.agent===CU.name);
+      });
   
   var statsHtml='<div class="stats-row">'
     +'<div class="stat"><div class="stat-lbl">Partners</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">Total restaurants</div></div>'
@@ -773,7 +783,12 @@ function submitRestaurant(){
 function renderPipeline(){
   var isOnboarding=CU.role==='onboarding';
   var list=restaurants.filter(function(r){
-    if(isOnboarding&&r.agent!==CU.name)return false;
+    if(isOnboarding){
+      var step=r.stepIndex||0;
+      var stepDef=STEPS[step];
+      // Show if agent OR current step is mine
+      if(r.agent!==CU.name&&!(stepDef&&stepDef.who===CU.name))return false;
+    }
     if(pipeFilter==='live')return r.status==='live';
     if(pipeFilter==='onboarding')return r.status!=='live';
     return true;
