@@ -335,9 +335,9 @@ tbody tr:hover td{background:var(--gray-50);}
 <div class="toast" id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════════
+// ==========================================
 // CONFIG
-// ═══════════════════════════════════════════
+// ==========================================
 var FB = {
   apiKey:"AIzaSyAofsIEnR6WclsU0ELmv8L_vd4mkfn8EuY",
   authDomain:"branchef-app.firebaseapp.com",
@@ -347,9 +347,9 @@ var FB = {
   appId:"1:485634496376:web:f7ea1f814c0faa37c1da8d"
 };
 
-// ═══════════════════════════════════════════
+// ==========================================
 // EMAILJS CONFIG
-// ═══════════════════════════════════════════
+// ==========================================
 var EMAILJS_SERVICE  = "service_vvqywr7";
 var EMAILJS_TEMPLATE = "template_tucjf8n";
 var EMAILJS_KEY      = "qsfusV53J4_RjftgA";
@@ -390,84 +390,30 @@ var BRANDS = {
 };
 
 var STEPS = [
-  {
-    id:0, who:"Saber",
-    title:"🔍 Find Empty Uber Eats Store",
-    desc:"Find the empty store created by account manager on Uber Eats. Match it to this restaurant's address.",
-    note:"Enter the Uber Eats store URL or store name you found",
-    alert:"Saber → Step 2: Fix store address & pickup instructions"
-  },
-  {
-    id:1, who:"Saber",
-    title:"📍 Fix Address & Pickup Instructions",
-    desc:"Update store address to match restaurant. Add pickup instructions: 'Go to [restaurant name] and pickup your order — this is a virtual brand with a different name.'",
-    note:"Confirm address updated and pickup instructions added",
-    alert:"Saber → Step 3: Prepare Marco list & contact Ritik"
-  },
-  {
-    id:2, who:"Saber",
-    title:"📋 Prepare Marco List & Contact Ritik",
-    desc:"Prepare the list of store names to send to Marco (name + phone changes). Contact Ritik to integrate the Uber Eats stores in UrbanPiper. Have the Marco list ready while waiting for Ritik.",
-    note:"Paste the store names you sent to Ritik for UrbanPiper integration",
-    alert:"Saber → Waiting for Ritik to write DONE in group. Zayd → Step 4 will be yours after Ritik confirms."
-  },
-  {
-    id:3, who:"Saber",
-    title:"✅ Ritik Says DONE → Send List to Marco",
-    desc:"Ritik wrote DONE in the group. Now send the prepared list to Marco to change store names and phone numbers on Uber Eats.",
-    note:"Confirm you sent the list to Marco with store names and phone numbers",
-    alert:"Zayd → Your turn! Step 5: UrbanPiper integration begins now"
-  },
-  {
-    id:4, who:"Zayd",
-    title:"🔗 UrbanPiper Integration",
-    desc:"Enter UrbanPiper and complete the integration for all stores of this restaurant. Verify all brands are connected properly.",
-    note:"Confirm all stores are integrated in UrbanPiper",
-    alert:"Saber → Step 6: Menu setup begins — enter restaurant and fix everything"
-  },
-  {
-    id:5, who:"Saber",
-    title:"🍔 Menu Setup",
-    desc:"Enter the restaurant on Uber Eats. Read the menu carefully. Match sides & drinks. Fix language (Quebec French OR English for rest of Canada/USA). Fix prices. Upload correct brand photos.",
-    note:"Confirm menu is complete — language, prices, photos all done. Note any issues.",
-    alert:"Saber → Step 7: Update brand covers and mark Ready"
-  },
-  {
-    id:6, who:"Saber",
-    title:"🎨 Update Covers & Mark Ready",
-    desc:"Update the covers for all brands on this restaurant. Click Ready on Uber Eats. Write a detailed note of everything completed.",
-    note:"Write your completion note here — what was done, any special notes for owners",
-    alert:"🔔 OWNERS: Restaurant ready for review! Please check and approve to go live."
-  },
-  {
-    id:7, who:"Owner",
-    title:"👑 Owner Review & Approval",
-    desc:"Review the restaurant setup — menu, covers, addresses, brand names. Approve to proceed to Go Live.",
-    note:"Owner approval note",
-    alert:"Saber → APPROVED! Step 9: Contact Uber Eats support or email Marco to Go Live"
-  },
-  {
-    id:8, who:"Saber",
-    title:"🚀 Go Live & Marketing",
-    desc:"Contact Uber Eats support on chat OR send email to Marco to activate the stores. Once live, start Uber Eats marketing campaigns 1 by 1.",
-    note:"Confirm stores are live. Note marketing start date.",
-    alert:"🎉 RESTAURANT IS LIVE! Great work team!"
-  }
+  {id:0,who:"Saber",title:"🔍 Find Empty Uber Eats Store",desc:"Find the empty store created by account manager on Uber Eats. Match it to this restaurant address.",note:"Enter the Uber Eats store name you found",alert:"Next: Fix address and pickup instructions"},
+  {id:1,who:"Saber",title:"📍 Fix Address & Pickup Instructions",desc:"Update store address to match restaurant. Add pickup instructions for drivers and customers explaining this is a virtual brand with a different name.",note:"Confirm address updated and pickup instructions added",alert:"Next: Prepare Marco list and contact Ritik"},
+  {id:2,who:"Saber",title:"📋 Prepare Marco List & Contact Ritik",desc:"Prepare the list of store names to send to Marco (name + phone changes). Contact Ritik to integrate the Uber Eats stores in UrbanPiper. Have the Marco list ready while waiting for Ritik.",note:"Paste the store names you sent to Ritik for UrbanPiper integration",alert:"Waiting for Ritik to write DONE. Zayd gets next step after Ritik confirms."},
+  {id:3,who:"Saber",title:"✅ Ritik Says DONE — Send List to Marco",desc:"Ritik wrote DONE in the group. Now send the prepared list to Marco to change store names and phone numbers on Uber Eats.",note:"Confirm you sent the list to Marco with store names and phone numbers",alert:"Zayd: Your turn! UrbanPiper integration begins now"},
+  {id:4,who:"Zayd",title:"🔗 UrbanPiper Integration",desc:"Enter UrbanPiper and complete the integration for all stores of this restaurant. Verify all brands are connected properly.",note:"Confirm all stores are integrated in UrbanPiper",alert:"Saber: Menu setup begins — enter restaurant and fix everything"},
+  {id:5,who:"Saber",title:"🍔 Menu Setup",desc:"Enter the restaurant on Uber Eats. Read the menu carefully. Match sides and drinks. Fix language: Quebec French menu or English for rest of Canada/USA. Fix prices. Upload correct brand photos.",note:"Confirm menu is complete — language, prices, photos all done. Note any issues.",alert:"Next: Update brand covers and mark Ready"},
+  {id:6,who:"Saber",title:"🎨 Update Covers & Mark Ready",desc:"Update the covers for all brands on this restaurant. Click Ready on Uber Eats. Write a detailed note of everything completed.",note:"Write your completion note — what was done, any special notes for owners",alert:"OWNERS: Restaurant ready for review! Please check and approve to go live."},
+  {id:7,who:"Owner",title:"👑 Owner Review & Approval",desc:"Review the restaurant setup — menu, covers, addresses, brand names. Approve to proceed to Go Live.",note:"Write your approval note",alert:"Saber: APPROVED! Contact Uber Eats support or email Marco to Go Live"},
+  {id:8,who:"Saber",title:"🚀 Go Live & Marketing",desc:"Contact Uber Eats support on chat OR send email to Marco to activate the stores. Once live, start Uber Eats marketing campaigns 1 by 1.",note:"Confirm stores are live. Note marketing start date.",alert:"RESTAURANT IS LIVE! Great work team!"}
 ];
 var STEP_LABELS=["Find Store","Fix Address","Contact Ritik","Send Marco","UrbanPiper","Menus","Covers","Review","Live 🚀"];
 var STEP_PILLS=["pill-new","pill-tablet","pill-onboard","pill-onboard","pill-integration","pill-menu","pill-optimization","pill-owner","pill-live"];
 
-// ═══════════════════════════════════════════
+// ==========================================
 // STATE
-// ═══════════════════════════════════════════
+// ==========================================
 var db,auth,currentUser,CU; // CU = currentUserInfo
 var restaurants=[],tablets=[],notifs=[];
 var pipeFilter='all';
 var clockedIn=false;
 
-// ═══════════════════════════════════════════
+// ==========================================
 // INIT
-// ═══════════════════════════════════════════
+// ==========================================
 window.addEventListener('load',function(){
   try{
     firebase.initializeApp(FB);
@@ -498,9 +444,9 @@ function startApp(){
   loadData();
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // ROLE-BASED NAV
-// ═══════════════════════════════════════════
+// ==========================================
 var NAV_OWNER=[
   {id:'dashboard',ico:'grid',label:'Dashboard'},
   {id:'notifications',ico:'bell',label:'Notifications',badge:true},
@@ -562,9 +508,9 @@ function svgIcon(name){
   return icons[name]||'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>';
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // PAGE ROUTER
-// ═══════════════════════════════════════════
+// ==========================================
 var PAGE_TITLES={dashboard:'Dashboard',add:'Add Restaurant',pipeline:CU&&CU.role==='onboarding'?'My Restaurants':'Pipeline',tablet:'Tablet Request',notifications:'Notifications',clock:'Clock In/Out',team:'Team',admin:'Admin Panel'};
 
 function showPage(name,btn){
@@ -589,9 +535,9 @@ function showPage(name,btn){
   window.scrollTo(0,0);
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // LIVE CLOCK
-// ═══════════════════════════════════════════
+// ==========================================
 function startClock(){
   function tick(){
     var now=new Date();
@@ -604,9 +550,9 @@ function startClock(){
   tick();setInterval(tick,1000);
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // PRESENCE (real online detection)
-// ═══════════════════════════════════════════
+// ==========================================
 var presenceUnsub=null;
 function updatePresence(){
   if(!db||!currentUser)return;
@@ -618,9 +564,9 @@ function updatePresence(){
   window.addEventListener('beforeunload',function(){ref.update({online:false,lastSeen:firebase.firestore.FieldValue.serverTimestamp()});});
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // LOAD DATA
-// ═══════════════════════════════════════════
+// ==========================================
 function loadData(){
   db.collection('restaurants').orderBy('createdAt','desc').onSnapshot(function(s){
     restaurants=[];s.forEach(function(d){restaurants.push(Object.assign({id:d.id},d.data()));});
@@ -652,9 +598,9 @@ function refreshCurrentPage(){
   }
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // DASHBOARD
-// ═══════════════════════════════════════════
+// ==========================================
 function renderDashboard(){
   var h=new Date().getHours();
   var g=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
@@ -763,9 +709,9 @@ function renderClockLogDash(){
   }).catch(function(){});
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // ADD RESTAURANT (owner + sales)
-// ═══════════════════════════════════════════
+// ==========================================
 function renderAdd(){
   var brandsHtml='';
   Object.keys(BRANDS).forEach(function(cat){
@@ -815,15 +761,15 @@ function submitRestaurant(){
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
     addNotif('new','🏪 '+CU.name+' added '+name+' → assigned to '+agent);
-    sendEmail('New Restaurant', CU.name, '🏪 '+CU.name+' added a new restaurant: '+name+'\nAddress: '+addr+'\nOwner: '+owner+'\nPhone: '+phone+'\nAssigned to: '+agent);
+    sendEmail('New Restaurant', CU.name, '🏪 '+CU.name+' added: '+name+' | Owner: '+owner+' | Agent: '+agent);
     showToast('✅ Submitted! '+agent+' notified.');
     showPage('pipeline',document.getElementById('nav-pipeline'));
   }).catch(function(e){showToast('❌ '+e.message);btn.disabled=false;btn.textContent='✅ Submit & notify team';});
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // PIPELINE
-// ═══════════════════════════════════════════
+// ==========================================
 function renderPipeline(){
   var isOnboarding=CU.role==='onboarding';
   var list=restaurants.filter(function(r){
@@ -876,9 +822,9 @@ function deleteResto(id,name){
   });
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // RESTAURANT MODAL
-// ═══════════════════════════════════════════
+// ==========================================
 function openResto(id){
   var r=restaurants.find(function(x){return x.id===id;});
   if(!r)return;
@@ -905,7 +851,7 @@ function openResto(id){
       if(canDoThis){
         noteHtml='<div style="margin-top:8px;">'
           +'<textarea id="step-note-'+i+'" placeholder="'+esc(s.note)+'" style="width:100%;padding:8px;border:1.5px solid var(--brand);border-radius:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;">'+esc(noteVal)+'</textarea>'
-          +'<button onclick="completeStep(''+id+'','+i+')" class="btn btn-primary btn-full" style="margin-top:8px;">✅ Complete → Next Step</button>'
+          +'<button onclick="completeStep(\''+id+'\','+i+')" class="btn btn-primary btn-full" style="margin-top:8px;">✅ Complete → Next Step</button>'
           +'</div>';
       } else {
         noteHtml='<div style="margin-top:6px;font-size:12px;color:var(--amber);font-weight:600;">⏳ Waiting for '+s.who+' to complete this step</div>';
@@ -957,20 +903,20 @@ function completeStep(id,stepIndex){
     if(nextDef)msg+=' → Next: '+nextDef.title+' ('+nextDef.who+')';
     addNotif('step',msg);
     if(stepIndex===6){
-      sendEmail('🔔 Ready for Review: '+r.name,CU.name,'🔔 '+r.name+' is ready for owner review!\n\nCompleted by: '+CU.name+'\nNote: '+noteText+'\n\nPlease login to BranChef HQ to approve.');
+      sendEmail('Ready for Review: '+r.name,CU.name,'🔔 '+r.name+' ready for review. Completed by: '+CU.name+'. Note: '+noteText);
     }
     if(isLive){
       addNotif('live','🚀 '+r.name+' is now LIVE! 🎉');
-      sendEmail('🚀 LIVE: '+r.name,CU.name,'🚀 '+r.name+' is now LIVE on Uber Eats! Marketing should start now.');
+      sendEmail('LIVE: '+r.name,CU.name,'🚀 '+r.name+' is now LIVE! Marketing starts now.');
     }
     showToast(isLive?'🚀 LIVE!':'✅ Done! Next: '+(nextDef?nextDef.title:'Complete'));
     closeModal('modal-resto');
   });
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // TABLET
-// ═══════════════════════════════════════════
+// ==========================================
 function renderTablet(){
   var pendingRows=tablets.filter(function(t){return t.status==='pending';}).map(function(t){
     return '<tr>'
@@ -1016,7 +962,7 @@ function submitTablet(){
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
     addNotif('tablet','📦 '+CU.name+' requested tablet for '+name+' — awaiting shipment');
-    sendEmail('Tablet Request 📦', CU.name, '📦 '+CU.name+' requested a tablet for: '+name+'\nDelivery address: '+addr+'\nOwner: '+owner);
+    sendEmail('Tablet Request', CU.name, '📦 '+CU.name+' requested tablet for: '+name+' | Address: '+addr);
     showToast('📦 Request sent! Owners notified.');
     ['t-name','t-owner','t-phone','t-addr','t-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   }).catch(function(e){showToast('❌ '+e.message);})
@@ -1030,9 +976,9 @@ function markShipped(id,name){
   });
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // NOTIFICATIONS
-// ═══════════════════════════════════════════
+// ==========================================
 var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'📢'};
 
 function renderNotifications(){
@@ -1068,9 +1014,9 @@ function addNotif(type,msg){
   db.collection('notifications').add({type:type,message:msg,read:false,createdBy:CU.name,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // CLOCK IN / OUT
-// ═══════════════════════════════════════════
+// ==========================================
 function renderClock(){
   document.getElementById('content').innerHTML=
     '<div class="page-hdr"><h2>Clock In / Out</h2><p>Track your working hours.</p></div>'
@@ -1125,7 +1071,7 @@ function clockIn(){
     date:today,clockIn:firebase.firestore.FieldValue.serverTimestamp(),clockOut:null
   }).then(function(){
     addNotif('clock','⏱ '+CU.name+' clocked in');
-    sendEmail('Clock In', CU.name, '⏱ '+CU.name+' just clocked IN at '+new Date().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' on '+new Date().toLocaleDateString('en-CA'));
+    sendEmail('Clock In', CU.name, '⏱ '+CU.name+' clocked IN at '+new Date().toLocaleTimeString('en-CA',{hour12:false}));
     showToast('⏱ Clocked in!');
     checkClockStatus();loadSessions();
   }).catch(function(e){showToast('❌ '+e.message);});
@@ -1140,7 +1086,7 @@ function clockOut(){
       if(open){
         open.ref.update({clockOut:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){
           addNotif('clock','⏹ '+CU.name+' clocked out');
-          sendEmail('Clock Out', CU.name, '⏹ '+CU.name+' just clocked OUT at '+new Date().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' on '+new Date().toLocaleDateString('en-CA'));
+          sendEmail('Clock Out', CU.name, '⏹ '+CU.name+' clocked OUT at '+new Date().toLocaleTimeString('en-CA',{hour12:false}));
           showToast('⏹ Clocked out!');
           checkClockStatus();loadSessions();
         });
@@ -1187,9 +1133,9 @@ function loadSessions(){
   }
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // TEAM PAGE
-// ═══════════════════════════════════════════
+// ==========================================
 function renderTeam(){
   var rows=Object.keys(TEAM).map(function(email){
     var t=TEAM[email];
@@ -1218,9 +1164,9 @@ function renderTeam(){
   });
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // ADMIN PANEL (owners only)
-// ═══════════════════════════════════════════
+// ==========================================
 function renderAdmin(){
   if(CU.role!=='owner'){document.getElementById('content').innerHTML='<div class="empty"><div class="empty-ico">🔒</div><p>Access denied</p></div>';return;}
   document.getElementById('content').innerHTML=
@@ -1337,9 +1283,9 @@ function adminStats(){
   openModal('modal-admin');
 }
 
-// ═══════════════════════════════════════════
+// ==========================================
 // AUTH
-// ═══════════════════════════════════════════
+// ==========================================
 function doLogin(){
   var email=document.getElementById('l-email').value.trim();
   var pass=document.getElementById('l-pass').value;
@@ -1358,9 +1304,9 @@ function doLogout(){
 
 document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
 
-// ═══════════════════════════════════════════
+// ==========================================
 // HELPERS
-// ═══════════════════════════════════════════
+// ==========================================
 function roleLabel(r){return r==='owner'?'Owner 👑':r==='onboarding'?'Onboarding Team':'Sales Team';}
 function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
 function getSelChips(sel){var out=[];document.querySelectorAll(sel+'.sel').forEach(function(el){out.push(el.getAttribute('data-val'));});return out;}
