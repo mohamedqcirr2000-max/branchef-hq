@@ -148,6 +148,7 @@ tbody tr:hover td{background:var(--gray-50);}
 .checklist{display:flex;flex-direction:column;gap:8px;}
 .ck-step{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:var(--radius);transition:all .15s;}
 .ck-step.done{background:var(--green-light);border-color:#86EFAC;}
+.ck-step.locked{opacity:.35;cursor:not-allowed;}
 .ck-step.cur{border-color:var(--brand);background:var(--brand-light);cursor:pointer;}
 .ck-step.cur:hover{opacity:.85;}
 .ck-circle{width:22px;height:22px;border-radius:50%;border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;margin-top:1px;}
@@ -389,15 +390,72 @@ var BRANDS = {
 };
 
 var STEPS = [
-  {title:"Tablet shipped",         desc:"Tablet configured and sent to restaurant"},
-  {title:"Store creation",         desc:"Create Uber Eats store with restaurant address"},
-  {title:"UrbanPiper integration", desc:"Send integration file & name change to UE account manager"},
-  {title:"Menu setup",             desc:"Upload menus — zero tolerance for mistakes"},
-  {title:"Optimization",           desc:"Match & optimize restaurant listing with BranChef"},
-  {title:"Go Live 🚀",             desc:"Test order done — activate Uber Eats marketing"}
+  {
+    id:0, who:"Saber",
+    title:"🔍 Find Empty Uber Eats Store",
+    desc:"Find the empty store created by account manager on Uber Eats. Match it to this restaurant's address.",
+    note:"Enter the Uber Eats store URL or store name you found",
+    alert:"Saber → Step 2: Fix store address & pickup instructions"
+  },
+  {
+    id:1, who:"Saber",
+    title:"📍 Fix Address & Pickup Instructions",
+    desc:"Update store address to match restaurant. Add pickup instructions: 'Go to [restaurant name] and pickup your order — this is a virtual brand with a different name.'",
+    note:"Confirm address updated and pickup instructions added",
+    alert:"Saber → Step 3: Prepare Marco list & contact Ritik"
+  },
+  {
+    id:2, who:"Saber",
+    title:"📋 Prepare Marco List & Contact Ritik",
+    desc:"Prepare the list of store names to send to Marco (name + phone changes). Contact Ritik to integrate the Uber Eats stores in UrbanPiper. Have the Marco list ready while waiting for Ritik.",
+    note:"Paste the store names you sent to Ritik for UrbanPiper integration",
+    alert:"Saber → Waiting for Ritik to write DONE in group. Zayd → Step 4 will be yours after Ritik confirms."
+  },
+  {
+    id:3, who:"Saber",
+    title:"✅ Ritik Says DONE → Send List to Marco",
+    desc:"Ritik wrote DONE in the group. Now send the prepared list to Marco to change store names and phone numbers on Uber Eats.",
+    note:"Confirm you sent the list to Marco with store names and phone numbers",
+    alert:"Zayd → Your turn! Step 5: UrbanPiper integration begins now"
+  },
+  {
+    id:4, who:"Zayd",
+    title:"🔗 UrbanPiper Integration",
+    desc:"Enter UrbanPiper and complete the integration for all stores of this restaurant. Verify all brands are connected properly.",
+    note:"Confirm all stores are integrated in UrbanPiper",
+    alert:"Saber → Step 6: Menu setup begins — enter restaurant and fix everything"
+  },
+  {
+    id:5, who:"Saber",
+    title:"🍔 Menu Setup",
+    desc:"Enter the restaurant on Uber Eats. Read the menu carefully. Match sides & drinks. Fix language (Quebec French OR English for rest of Canada/USA). Fix prices. Upload correct brand photos.",
+    note:"Confirm menu is complete — language, prices, photos all done. Note any issues.",
+    alert:"Saber → Step 7: Update brand covers and mark Ready"
+  },
+  {
+    id:6, who:"Saber",
+    title:"🎨 Update Covers & Mark Ready",
+    desc:"Update the covers for all brands on this restaurant. Click Ready on Uber Eats. Write a detailed note of everything completed.",
+    note:"Write your completion note here — what was done, any special notes for owners",
+    alert:"🔔 OWNERS: Restaurant ready for review! Please check and approve to go live."
+  },
+  {
+    id:7, who:"Owner",
+    title:"👑 Owner Review & Approval",
+    desc:"Review the restaurant setup — menu, covers, addresses, brand names. Approve to proceed to Go Live.",
+    note:"Owner approval note",
+    alert:"Saber → APPROVED! Step 9: Contact Uber Eats support or email Marco to Go Live"
+  },
+  {
+    id:8, who:"Saber",
+    title:"🚀 Go Live & Marketing",
+    desc:"Contact Uber Eats support on chat OR send email to Marco to activate the stores. Once live, start Uber Eats marketing campaigns 1 by 1.",
+    note:"Confirm stores are live. Note marketing start date.",
+    alert:"🎉 RESTAURANT IS LIVE! Great work team!"
+  }
 ];
-var STEP_LABELS=["Tablet","Store","Integration","Menus","Optimize","Go Live"];
-var STEP_PILLS=["pill-tablet","pill-onboard","pill-integration","pill-menu","pill-optimization","pill-live"];
+var STEP_LABELS=["Find Store","Fix Address","Contact Ritik","Send Marco","UrbanPiper","Menus","Covers","Review","Live 🚀"];
+var STEP_PILLS=["pill-new","pill-tablet","pill-onboard","pill-onboard","pill-integration","pill-menu","pill-optimization","pill-owner","pill-live"];
 
 // ═══════════════════════════════════════════
 // STATE
@@ -648,9 +706,16 @@ function renderDashboard(){
 function renderDashActivity(){
   var el=document.getElementById('dash-activity');
   if(!el)return;
-  if(!notifs.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
   var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'📢'};
-  el.innerHTML=notifs.slice(0,6).map(function(n){
+  // Filter notifications by role
+  var filtered=notifs.filter(function(n){
+    if(CU.role==='owner')return true;
+    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||n.type==='clock';
+    if(CU.role==='sales')return n.type==='tablet'||n.type==='clock';
+    return false;
+  });
+  if(!filtered.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
+  el.innerHTML=filtered.slice(0,6).map(function(n){
     return '<div class="notif-row"><div class="notif-ico">'+(ICONS[n.type]||'📢')+'</div>'
       +'<div class="notif-body"><div class="notif-txt">'+esc(n.message)+'</div><div class="notif-time">'+timeAgo(n.createdAt)+'</div></div></div>';
   }).join('');
@@ -818,61 +883,87 @@ function openResto(id){
   var r=restaurants.find(function(x){return x.id===id;});
   if(!r)return;
   var step=r.stepIndex||0;
-  var canEdit=CU.role==='owner'||CU.name===r.agent;
+  var notes=r.stepNotes||{};
+  var currentStepDef=STEPS[step]||{};
+  var isMyStep=CU.role==='owner'||(CU.name==='Saber'&&currentStepDef.who==='Saber')||(CU.name==='Zayd'&&currentStepDef.who==='Zayd');
 
   var stepsHtml=STEPS.map(function(s,i){
     var done=i<step;
     var cur=i===step&&r.status!=='live';
-    var cls='ck-step'+(done?' done':'')+(cur?' cur':'');
-    var onclick=canEdit&&cur?' onclick="advanceStep(\''+id+'\','+i+')"':'';
-    return '<div class="'+cls+'"'+onclick+'>'
-      +'<div class="ck-circle">'+(done?'✓':i+1)+'</div>'
-      +'<div class="ck-info"><div class="ck-title">'+s.title+'</div><div class="ck-desc">'+s.desc+'</div></div>'
-      +'</div>';
+    var locked=i>step;
+    var noteVal=notes[i]||'';
+    var whoColor=s.who==='Zayd'?'#92400E':s.who==='Owner'?'#4338CA':'var(--brand-text)';
+    var whoBg=s.who==='Zayd'?'var(--amber-light)':s.who==='Owner'?'#EEF2FF':'var(--brand-light)';
+    var whoTag='<span style="font-size:10px;font-weight:700;background:'+whoBg+';color:'+whoColor+';padding:2px 7px;border-radius:20px;margin-left:6px;">'+s.who+'</span>';
+    var cls='ck-step'+(done?' done':cur?' cur':'');
+    var noteHtml='';
+    if(done&&noteVal){
+      noteHtml='<div style="margin-top:6px;font-size:11px;background:rgba(0,0,0,.04);border-radius:6px;padding:6px 8px;color:var(--gray-600);">📝 '+esc(noteVal)+'</div>';
+    }
+    var canDoThis=CU.role==='owner'||(CU.name==='Saber'&&s.who==='Saber')||(CU.name==='Zayd'&&s.who==='Zayd');
+    if(cur&&r.status!=='live'){
+      if(canDoThis){
+        noteHtml='<div style="margin-top:8px;">'
+          +'<textarea id="step-note-'+i+'" placeholder="'+esc(s.note)+'" style="width:100%;padding:8px;border:1.5px solid var(--brand);border-radius:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;">'+esc(noteVal)+'</textarea>'
+          +'<button onclick="completeStep(''+id+'','+i+')" class="btn btn-primary btn-full" style="margin-top:8px;">✅ Complete → Next Step</button>'
+          +'</div>';
+      } else {
+        noteHtml='<div style="margin-top:6px;font-size:12px;color:var(--amber);font-weight:600;">⏳ Waiting for '+s.who+' to complete this step</div>';
+      }
+    }
+    return '<div class="'+cls+'" style="'+(locked?'opacity:.35;':'')+'">'
+      +'<div class="ck-circle">'+((done)?'✓':(cur?'▶':(i+1)))+'</div>'
+      +'<div class="ck-info" style="flex:1;">'
+      +'<div class="ck-title">'+s.title+whoTag+'</div>'
+      +'<div class="ck-desc">'+s.desc+'</div>'
+      +noteHtml
+      +'</div></div>';
   }).join('');
 
-  var liveBtn='';
-  if(r.status==='live'){liveBtn='<div class="pill pill-live" style="margin-top:14px;padding:10px 18px;font-size:13px;width:100%;justify-content:center;">✓ This location is LIVE</div>';}
-  else if(step>=6&&canEdit){liveBtn='<button class="btn btn-success btn-full" style="margin-top:14px;" onclick="markLive(\''+id+'\')">🚀 Mark as LIVE!</button>';}
-  else if(step===5&&canEdit){liveBtn='<button class="btn btn-success btn-full" style="margin-top:14px;" onclick="markLive(\''+id+'\')">🚀 All steps done — Mark as LIVE!</button>';}
-
+  var pct=Math.round((step/9)*100);
   document.getElementById('mr-title').textContent=r.name;
   document.getElementById('mr-body').innerHTML=
     '<div class="drow"><div class="dlbl">Owner</div><div class="dval">'+esc(r.ownerName)+'</div></div>'
     +'<div class="drow"><div class="dlbl">Phone</div><div class="dval"><a href="tel:'+esc(r.phone)+'" style="color:var(--brand);">'+esc(r.phone)+'</a></div></div>'
-    +'<div class="drow"><div class="dlbl">Email</div><div class="dval">'+esc(r.email||'—')+'</div></div>'
     +'<div class="drow"><div class="dlbl">Address</div><div class="dval">'+esc(r.address)+'</div></div>'
-    +'<div class="drow"><div class="dlbl">Platforms</div><div class="dval">'+(r.platforms||[]).join(', ')+'</div></div>'
     +'<div class="drow"><div class="dlbl">Brands</div><div class="dval" style="font-size:12px;line-height:1.6;">'+(r.brands||[]).join(' · ')+'</div></div>'
-    +'<div class="drow"><div class="dlbl">Agent</div><div class="dval">'+esc(r.agent)+'</div></div>'
     +(r.notes?'<div class="drow"><div class="dlbl">Notes</div><div class="dval">'+esc(r.notes)+'</div></div>':'')
     +'<div class="divider"></div>'
-    +'<div style="font-size:12px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Onboarding checklist'+(canEdit&&r.status!=='live'?' — tap current step to advance':' — view only')+'</div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    +'<div style="font-size:13px;font-weight:700;">Step '+(Math.min(step+1,9))+' of 9'+(r.status==='live'?' <span class=\"pill pill-live\">✓ LIVE</span>':'')+'</div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--brand);">'+pct+'%</div></div>'
+    +'<div style="height:6px;background:var(--gray-100);border-radius:3px;margin-bottom:16px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:3px;"></div></div>'
     +'<div class="checklist">'+stepsHtml+'</div>'
-    +liveBtn;
+    +(r.status==='live'?'<div style="margin-top:14px;text-align:center;padding:12px;background:var(--green-light);border-radius:10px;font-weight:700;color:#166534;">🎉 This restaurant is LIVE!</div>':'');
   openModal('modal-resto');
 }
 
-function advanceStep(id,curStep){
+function completeStep(id,stepIndex){
   var r=restaurants.find(function(x){return x.id===id;});
   if(!r)return;
-  var newStep=curStep+1;
-  db.collection('restaurants').doc(id).update({stepIndex:newStep}).then(function(){
-    var done=STEPS[curStep]?STEPS[curStep].title:'step';
-    var next=STEPS[newStep]?STEPS[newStep].title:'done';
-    addNotif('step','✅ '+CU.name+' completed "'+done+'" for '+r.name+' → next: '+next);
-    showToast('✅ Step completed!');
-    closeModal('modal-resto');
-  });
-}
-
-function markLive(id){
-  var r=restaurants.find(function(x){return x.id===id;});
-  if(!r)return;
-  db.collection('restaurants').doc(id).update({status:'live',stepIndex:6}).then(function(){
-    addNotif('live','🚀 '+r.name+' is now LIVE! Great work '+r.agent+'! 🎉');
-    sendEmail('Restaurant LIVE! 🚀', r.agent, '🚀 '+r.name+' is now LIVE on Uber Eats!\nAgent: '+r.agent+'\nAddress: '+r.address);
-    showToast('🚀 LIVE! Congratulations!');
+  var noteEl=document.getElementById('step-note-'+stepIndex);
+  var noteText=noteEl?noteEl.value.trim():'';
+  if(!noteText){showToast('⚠️ Please write a note first');return;}
+  var newStep=stepIndex+1;
+  var notes=r.stepNotes||{};
+  notes[stepIndex]=noteText;
+  var isLive=newStep>=9;
+  var updateData={stepIndex:newStep,stepNotes:notes};
+  if(isLive)updateData.status='live';
+  db.collection('restaurants').doc(id).update(updateData).then(function(){
+    var doneTitle=STEPS[stepIndex]?STEPS[stepIndex].title:'step';
+    var nextDef=STEPS[newStep];
+    var msg='✅ '+CU.name+' completed "'+doneTitle+'" for '+r.name;
+    if(nextDef)msg+=' → Next: '+nextDef.title+' ('+nextDef.who+')';
+    addNotif('step',msg);
+    if(stepIndex===6){
+      sendEmail('🔔 Ready for Review: '+r.name,CU.name,'🔔 '+r.name+' is ready for owner review!\n\nCompleted by: '+CU.name+'\nNote: '+noteText+'\n\nPlease login to BranChef HQ to approve.');
+    }
+    if(isLive){
+      addNotif('live','🚀 '+r.name+' is now LIVE! 🎉');
+      sendEmail('🚀 LIVE: '+r.name,CU.name,'🚀 '+r.name+' is now LIVE on Uber Eats! Marketing should start now.');
+    }
+    showToast(isLive?'🚀 LIVE!':'✅ Done! Next: '+(nextDef?nextDef.title:'Complete'));
     closeModal('modal-resto');
   });
 }
@@ -945,7 +1036,13 @@ function markShipped(id,name){
 var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'📢'};
 
 function renderNotifications(){
-  var html=notifs.length?notifs.map(function(n){
+  var filtered=notifs.filter(function(n){
+    if(CU.role==='owner')return true;
+    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||n.type==='clock';
+    if(CU.role==='sales')return n.type==='tablet'||n.type==='clock'||n.type==='new';
+    return false;
+  });
+  var html=filtered.length?filtered.map(function(n){
     return '<div class="notif-row '+(n.read?'':'unread')+'" onclick="markRead(\''+n.id+'\')">'
       +'<div class="notif-ico">'+(ICONS[n.type]||'📢')+'</div>'
       +'<div class="notif-body"><div class="notif-txt">'+esc(n.message)+'</div><div class="notif-time">'+timeAgo(n.createdAt)+'</div></div>'
@@ -954,7 +1051,7 @@ function renderNotifications(){
   }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>No notifications yet</p></div>';
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Notifications</h2><p>All team activity in real time.</p></div>'
+    '<div class="page-hdr"><h2>Notifications</h2><p>Your activity feed.</p></div>'
     +'<div class="card">'+html+'</div>';
 }
 
