@@ -481,12 +481,25 @@ function t(key){ return (T[lang]&&T[lang][key]) ? T[lang][key] : (T['en'][key]||
 function setLang(l){
   lang=l;
   localStorage.setItem('bc_lang',l);
-  applyLangUI();
+  // Update topbar lang button
   var tl=document.getElementById('topbar-lang');
   if(tl)tl.textContent=l==='fr'?'🇫🇷 FR':'🇬🇧 EN';
+  // Rebuild nav with new labels
+  buildNav();
+  // Update page titles map
+  PAGE_TITLES={
+    dashboard:t('dashboard'),add:t('add_resto'),
+    pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',
+    tablet:t('tablet'),notifications:t('notifications'),
+    clock:t('clock'),team:t('team'),admin:t('admin')
+  };
   // Re-render current page
   var active=document.querySelector('.sb-item.active');
-  if(active){var id=active.id.replace('nav-','');showPage(id,active);}
+  if(active){
+    var id=active.id.replace('nav-','');
+    document.getElementById('topbar-title').textContent=PAGE_TITLES[id]||id;
+    showPage(id,active);
+  }
 }
 
 function applyLangUI(){
@@ -618,51 +631,56 @@ function startApp(){
 // ==========================================
 // ROLE-BASED NAV
 // ==========================================
-var NAV_OWNER=[
-  {id:'dashboard',ico:'grid',label:'Dashboard'},
-  {id:'notifications',ico:'bell',label:'Notifications',badge:true},
-  {sec:'Operations'},
-  {id:'add',ico:'plus-circle',label:'Add Restaurant'},
-  {id:'pipeline',ico:'list',label:'Pipeline'},
-  {id:'tablet',ico:'tablet',label:'Tablet Requests'},
-  {sec:'Team'},
-  {id:'clock',ico:'clock',label:'Clock In/Out'},
-  {id:'team',ico:'users',label:'Team'},
-  {id:'admin',ico:'settings',label:'Admin Panel'},
-];
-var NAV_ONBOARDING=[
-  {id:'dashboard',ico:'grid',label:'Dashboard'},
-  {id:'notifications',ico:'bell',label:'Notifications',badge:true},
-  {sec:'My Work'},
-  {id:'pipeline',ico:'list',label:'My Restaurants'},
-  {sec:'Team'},
-  {id:'clock',ico:'clock',label:'Clock In/Out'},
-];
-var NAV_SALES=[
-  {id:'dashboard',ico:'grid',label:'Dashboard'},
-  {id:'notifications',ico:'bell',label:'Notifications',badge:true},
-  {sec:'My Work'},
-  {id:'tablet',ico:'tablet',label:'Tablet Request'},
-  {sec:''},
-  {id:'clock',ico:'clock',label:'Clock In/Out'},
-];
-
-var NAV_MAP={owner:NAV_OWNER,onboarding:NAV_ONBOARDING,sales:NAV_SALES};
 
 function buildNav(){
-  var items=NAV_MAP[CU.role]||NAV_OWNER;
+  var NAV_OWNER=[
+    {id:'dashboard',ico:'grid',label:t('dashboard')},
+    {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
+    {sec:'Operations'},
+    {id:'add',ico:'plus-circle',label:t('add_resto')},
+    {id:'pipeline',ico:'list',label:'Pipeline'},
+    {id:'tablet',ico:'tablet',label:t('tablets')},
+    {sec:t('team')},
+    {id:'clock',ico:'clock',label:t('clock')},
+    {id:'team',ico:'users',label:t('team')},
+    {id:'admin',ico:'settings',label:t('admin')},
+  ];
+  var NAV_ONBOARDING=[
+    {id:'dashboard',ico:'grid',label:t('dashboard')},
+    {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
+    {sec:'My Work'},
+    {id:'pipeline',ico:'list',label:t('my_restos')},
+    {sec:t('team')},
+    {id:'clock',ico:'clock',label:t('clock')},
+  ];
+  var NAV_SALES=[
+    {id:'dashboard',ico:'grid',label:t('dashboard')},
+    {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
+    {sec:'My Work'},
+    {id:'tablet',ico:'tablet',label:t('tablet')},
+    {sec:''},
+    {id:'clock',ico:'clock',label:t('clock')},
+  ];
+  var NAV_MAP={owner:NAV_OWNER,onboarding:NAV_ONBOARDING,sales:NAV_SALES};
+  var items=NAV_MAP[CU?CU.role:'owner']||NAV_OWNER;
+  // Remember active page
+  var activeId='dashboard';
+  var cur=document.querySelector('.sb-item.active');
+  if(cur)activeId=cur.id.replace('nav-','');
   var html='';
   items.forEach(function(item){
     if(item.sec!==undefined){
-      if(item.sec) html+='<div class="sb-section">'+item.sec+'</div>';
+      if(item.sec)html+='<div class="sb-section">'+item.sec+'</div>';
       return;
     }
-    html+='<button class="sb-item'+(item.id==='dashboard'?' active':'')+'" id="nav-'+item.id+'" onclick="showPage(\''+item.id+'\',this)">'
+    html+='<button class="sb-item'+(item.id===activeId?' active':'')+'" id="nav-'+item.id+'" onclick="showPage(\''+item.id+'\',this)">'
       +svgIcon(item.ico)+item.label
       +(item.badge?'<span class="sb-badge" id="notif-badge" style="display:none">0</span>':'')
       +'</button>';
   });
-  document.getElementById('sb-nav').innerHTML=html;
+  var nav=document.getElementById('sb-nav');
+  if(nav)nav.innerHTML=html;
+  updateBadge();
 }
 
 function svgIcon(name){
@@ -1651,7 +1669,7 @@ function addAITyping(){
 
 function removeTyping(){var t=document.getElementById('ai-typing');if(t)t.remove();}
 
-var BRANCHEF_SYSTEM='You are the BranChef HQ AI assistant. BranChef is a virtual brand management company based in Montreal, Canada. It places multiple virtual brands inside physical restaurant locations and collects weekly commissions on delivery platform payouts (mainly Uber Eats, some DoorDash). The onboarding team consists of Saber (does most steps) and Zayd (UrbanPiper integration only). The 9-step onboarding process is: 1) Find empty Uber Eats store, 2) Fix address & pickup instructions, 3) Prepare Marco list & contact Ritik, 4) Ritik says DONE → send list to Marco, 5) Zayd does UrbanPiper integration, 6) Menu setup (language/prices/photos), 7) Update covers & mark Ready, 8) Owner review & approval, 9) Go Live & marketing. Sales team handles tablet requests. Owners (Nadir/Simo) can see everything and approve at step 8. Answer questions about the platform, steps, team roles, or anything work-related. Be concise and helpful. If asked in French, answer in French.';
+var BRANCHEF_SYSTEM='You are the BranChef HQ AI assistant. BranChef is a virtual brand management company based in Montreal, Canada. It places multiple virtual brands inside physical restaurant locations and collects weekly commissions on delivery platform payouts (mainly Uber Eats, some DoorDash). The onboarding team consists of Saber (does most steps) and Zayd (UrbanPiper integration only). The 9-step onboarding process is: 1) Find empty Uber Eats store, 2) Fix address & pickup instructions, 3) Prepare Marco list & contact Ritik, 4) Ritik says DONE - send list to Marco, 5) Zayd does UrbanPiper integration, 6) Menu setup (language/prices/photos), 7) Update covers & mark Ready, 8) Owner review & approval, 9) Go Live & marketing. Sales team handles tablet requests. Owners (Nadir/Simo) can see everything and approve at step 8. You can also help write messages, emails, explain steps, translate things, or help with any work task. Answer questions about the platform, steps, team roles, or anything work-related. Be concise and friendly. If asked in French, answer in French.';
 
 function sendAI(){
   var input=document.getElementById('ai-input');
@@ -1667,7 +1685,11 @@ function sendAI(){
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
     body:JSON.stringify({
       model:'claude-sonnet-4-20250514',
       max_tokens:1000,
