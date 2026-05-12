@@ -325,7 +325,10 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
-        <button onclick="setLang(lang==='en'?'fr':'en')" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button>
+          <button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">🇫🇷 FR</button>
+        </div>
         <button onclick="toggleAIChat()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🤖 AI</button>
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
@@ -481,12 +484,7 @@ function t(key){ return (T[lang]&&T[lang][key]) ? T[lang][key] : (T['en'][key]||
 function setLang(l){
   lang=l;
   localStorage.setItem('bc_lang',l);
-  // Update login screen buttons
   applyLangUI();
-  // Update topbar button (lang is now set, so use it correctly)
-  var tl=document.getElementById('topbar-lang');
-  if(tl)tl.textContent=lang==='fr'?'🇫🇷 FR':'🇬🇧 EN';
-  // Only rebuild if logged in
   if(!CU)return;
   buildNav();
   var active=document.querySelector('.sb-item.active');
@@ -509,12 +507,20 @@ function applyLangUI(){
   var ca=document.getElementById('captcha-ans');if(ca)ca.placeholder=t('captcha_placeholder');
   var lb=document.getElementById('login-btn');if(lb&&!lb.disabled)lb.textContent=t('signin');
   var fp=document.querySelector('button[onclick="showForgot()"]');if(fp)fp.textContent=t('forgot');
-  // Lang toggle buttons
+  // Login screen lang buttons
   ['btn-lang-en','btn-lang-fr'].forEach(function(id){
     var b=document.getElementById(id);
     if(!b)return;
     if(id==='btn-lang-'+lang){b.style.background='var(--brand)';b.style.color='#fff';}
     else{b.style.background='var(--white)';b.style.color='var(--gray-800)';}
+  });
+  // Topbar lang buttons
+  ['topbar-lang-en','topbar-lang-fr'].forEach(function(id){
+    var b=document.getElementById(id);
+    if(!b)return;
+    var l=id.replace('topbar-lang-','');
+    if(l===lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}
+    else{b.style.background='var(--gray-100)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}
   });
 }
 
@@ -622,10 +628,7 @@ function startApp(){
   startClock();
   updatePresence();
   loadData();
-  // Apply language
   applyLangUI();
-  var tl=document.getElementById('topbar-lang');
-  if(tl)tl.textContent=lang==='fr'?'🇫🇷 FR':'🇬🇧 EN';
 }
 
 // ==========================================
