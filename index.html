@@ -326,10 +326,10 @@ tbody tr:hover td{background:var(--gray-50);}
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
         <div style="display:flex;gap:4px;align-items:center;">
-          <button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button>
+          <button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--brand);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button>
           <button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">🇫🇷 FR</button>
         </div>
-        <button onclick="toggleAIChat()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🤖 AI</button>
+        
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
     </div>
@@ -356,22 +356,6 @@ tbody tr:hover td{background:var(--gray-50);}
       <button class="modal-close" onclick="closeModal('modal-admin')">✕</button>
     </div>
     <div class="modal-body" id="ma-body"></div>
-  </div>
-</div>
-
-<!-- AI CHAT PANEL -->
-<div id="ai-chat-panel" style="display:none;position:fixed;bottom:24px;right:24px;width:360px;max-height:520px;background:var(--white);border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,.18);z-index:500;display:none;flex-direction:column;overflow:hidden;">
-  <div style="background:linear-gradient(135deg,var(--brand),var(--brand2));padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div style="width:32px;height:32px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;">🤖</div>
-      <div><div style="font-size:14px;font-weight:700;color:#fff;" id="ai-chat-title">BranChef AI</div><div style="font-size:11px;color:rgba(255,255,255,.7);">Always here to help</div></div>
-    </div>
-    <button onclick="toggleAIChat()" style="background:rgba(255,255,255,.2);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;color:#fff;font-size:14px;">✕</button>
-  </div>
-  <div id="ai-messages" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;max-height:360px;min-height:200px;"></div>
-  <div style="padding:12px;border-top:1px solid var(--gray-100);display:flex;gap:8px;">
-    <input id="ai-input" type="text" placeholder="Ask anything…" style="flex:1;padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')sendAI()">
-    <button onclick="sendAI()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" id="ai-send-btn">→</button>
   </div>
 </div>
 
@@ -511,8 +495,8 @@ function applyLangUI(){
   ['btn-lang-en','btn-lang-fr'].forEach(function(id){
     var b=document.getElementById(id);
     if(!b)return;
-    if(id==='btn-lang-'+lang){b.style.background='var(--brand)';b.style.color='#fff';}
-    else{b.style.background='var(--white)';b.style.color='var(--gray-800)';}
+    if(id==='btn-lang-'+lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}
+    else{b.style.background='var(--white)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}
   });
   // Topbar lang buttons
   ['topbar-lang-en','topbar-lang-fr'].forEach(function(id){
@@ -855,7 +839,7 @@ function renderDashActivity(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
     if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return n.type==='tablet'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
   if(!filtered.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
