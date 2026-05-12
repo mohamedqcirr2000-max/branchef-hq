@@ -325,7 +325,7 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
-        <button onclick="setLang(lang==='en'?'fr':'en')" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
+        <button onclick="setLang(lang==='en'?'fr':'en');this.textContent=lang==='fr'?'🇫🇷 FR':'🇬🇧 EN'" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
         <button onclick="toggleAIChat()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🤖 AI</button>
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
@@ -1679,33 +1679,102 @@ function sendAI(){
   input.value='';
   btn.disabled=true;
   addAIMsg('user',msg);
-  aiHistory.push({role:'user',content:msg});
   addAITyping();
-
-  fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:1000,
-      system:BRANCHEF_SYSTEM,
-      messages:aiHistory.slice(-10)
-    })
-  }).then(function(r){return r.json();}).then(function(data){
+  // Simulate thinking delay
+  setTimeout(function(){
     removeTyping();
-    var reply=(data.content&&data.content[0]&&data.content[0].text)||'Sorry, I could not get a response.';
-    aiHistory.push({role:'assistant',content:reply});
+    var reply=getBranChefAIReply(msg);
     addAIMsg('bot',reply);
     btn.disabled=false;
-  }).catch(function(){
-    removeTyping();
-    addAIMsg('bot','⚠️ Connection error. Please try again.');
-    btn.disabled=false;
-  });
+  },800+Math.random()*600);
+}
+
+function getBranChefAIReply(msg){
+  var m=msg.toLowerCase();
+  var isFr=lang==='fr'||/bonjour|merci|comment|qu[ée]|pourquoi|quand|quel|aide|étape|étapes/.test(m);
+
+  // Steps questions
+  if(/step|étape|onboard|process|processus/.test(m)){
+    if(isFr)return 'Le processus d\'intégration BranChef comporte 9 étapes:\n1. 🔍 Trouver le store Uber Eats vide\n2. 📍 Corriger l\'adresse & instructions de collecte\n3. 📋 Préparer la liste Marco + contacter Ritik\n4. ✅ Ritik dit DONE → envoyer liste à Marco\n5. 🔗 Intégration UrbanPiper (Zayd)\n6. 🍔 Configuration des menus\n7. 🎨 Mise à jour des covers + marquer Prêt\n8. 👑 Validation par Nadir/Simo\n9. 🚀 Go Live + Marketing';
+    return 'The BranChef onboarding has 9 steps:\n1. 🔍 Find the empty Uber Eats store\n2. 📍 Fix address & pickup instructions\n3. 📋 Prepare Marco list & contact Ritik\n4. ✅ Ritik says DONE → send list to Marco\n5. 🔗 UrbanPiper integration (Zayd)\n6. 🍔 Menu setup (language/prices/photos)\n7. 🎨 Update covers & mark Ready\n8. 👑 Owner review (Nadir/Simo)\n9. 🚀 Go Live & Marketing';
+  }
+  // Saber role
+  if(/saber/.test(m)){
+    if(isFr)return 'Saber est responsable de presque toutes les étapes : trouver les stores, corriger les adresses, contacter Ritik et Marco, configurer les menus, mettre à jour les covers et gérer le Go Live. Il a accès à tout sauf UrbanPiper.';
+    return 'Saber handles almost everything: finding stores, fixing addresses, contacting Ritik & Marco, menu setup, updating covers, and Go Live. He has access to everything except UrbanPiper.';
+  }
+  // Zayd role
+  if(/zayd/.test(m)){
+    if(isFr)return 'Zayd est spécialisé dans l\'intégration UrbanPiper (étape 5). C\'est lui qui connecte les stores Uber Eats à UrbanPiper après que Ritik confirme que c\'est prêt.';
+    return 'Zayd specializes in UrbanPiper integration (step 5). He connects the Uber Eats stores to UrbanPiper after Ritik confirms they are ready.';
+  }
+  // Ritik / Marco
+  if(/ritik/.test(m)){
+    if(isFr)return 'Ritik est le contact UrbanPiper. Saber lui envoie la liste des stores à intégrer. Quand Ritik écrit DONE dans le groupe, Saber envoie la liste à Marco pour changer les noms.';
+    return 'Ritik is the UrbanPiper contact. Saber sends him the list of stores to integrate. When Ritik writes DONE in the group, Saber sends the list to Marco for name changes.';
+  }
+  if(/marco/.test(m)){
+    if(isFr)return 'Marco est le gestionnaire de compte Uber Eats. Saber lui envoie la liste des stores avec les nouveaux noms et numéros de téléphone. Marco gère aussi le Go Live des stores.';
+    return 'Marco is the Uber Eats account manager. Saber sends him the list of stores with new names and phone numbers. Marco also handles the Go Live activation of stores.';
+  }
+  // Pipeline
+  if(/pipeline|restaurant|status/.test(m)){
+    if(isFr)return 'Le Pipeline montre tous les restaurants en cours d\'intégration. Chaque restaurant avance étape par étape. Saber et Zayd ne peuvent pas sauter d\'étape — chaque étape nécessite une note avant de passer à la suivante.';
+    return 'The Pipeline shows all restaurants being onboarded. Each restaurant moves step by step. Saber and Zayd cannot skip steps — each step requires a written note before advancing.';
+  }
+  // Tablet
+  if(/tablet|tablette/.test(m)){
+    if(isFr)return 'Les demandes de tablette sont soumises par l\'équipe commerciale lorsqu\'un restaurant confirme son intérêt. Nadir et Simo reçoivent une alerte et peuvent marquer la tablette comme expédiée.';
+    return 'Tablet requests are submitted by the sales team when a restaurant confirms interest. Nadir and Simo get an alert and can mark the tablet as shipped.';
+  }
+  // Clock / pointage
+  if(/clock|pointage|heure|time/.test(m)){
+    if(isFr)return 'Le pointage permet à chaque membre de l\'équipe d\'enregistrer ses heures. Cliquez sur "Pointage" dans le menu, puis sur "Clock In" pour commencer et "Clock Out" pour terminer. Nadir et Simo voient le rapport complet.';
+    return 'Clock In/Out lets each team member track their hours. Click "Clock In/Out" in the menu, then click "Clock In" to start and "Clock Out" to finish. Nadir and Simo see the full report.';
+  }
+  // Brands / marques
+  if(/brand|marque|virtual|virtuel/.test(m)){
+    if(isFr)return 'BranChef place plusieurs marques virtuelles dans des restaurants physiques. Exemples de marques : Smash Burger, Poutine Mafia, KRNCHY CHICKEN, ShawarMan, etc. Les marques ont des noms différents du restaurant physique, d\'où l\'importance des instructions de collecte.';
+    return 'BranChef places multiple virtual brands inside physical restaurants. Examples: Smash Burger, Poutine Mafia, KRNCHY CHICKEN, ShawarMan, etc. The brands have different names than the physical restaurant, which is why pickup instructions are important.';
+  }
+  // Menu
+  if(/menu|language|langue|french|english|prix|price/.test(m)){
+    if(isFr)return 'Pour la configuration du menu (étape 6) : si le restaurant est au Québec → menu en français québécois. Si c\'est le reste du Canada ou les USA → menu en anglais. Zéro tolérance pour les erreurs de menu. Les prix et photos doivent aussi être vérifiés.';
+    return 'For menu setup (step 6): if the restaurant is in Quebec → Quebec French menu. If rest of Canada or USA → English menu. Zero tolerance for menu mistakes. Prices and photos must also be verified.';
+  }
+  // Go live / marketing
+  if(/live|marketing|go live/.test(m)){
+    if(isFr)return 'Le Go Live (étape 9) : Saber contacte le support Uber Eats par chat OU envoie un email à Marco pour activer les stores. Une fois en ligne, le marketing Uber Eats démarre 1 par 1.';
+    return 'Go Live (step 9): Saber contacts Uber Eats support via chat OR sends an email to Marco to activate the stores. Once live, Uber Eats marketing starts 1 by 1.';
+  }
+  // Owner / Nadir / Simo
+  if(/nadir|simo|owner|propriétaire/.test(m)){
+    if(isFr)return 'Nadir et Simo sont les propriétaires de BranChef. Ils voient tout dans l\'application : pipeline complet, pointage de l\'équipe, demandes de tablette, et notifications. Ils approuvent les restaurants à l\'étape 8 avant le Go Live.';
+    return 'Nadir and Simo are the BranChef owners. They see everything in the app: full pipeline, team clock log, tablet requests, and all notifications. They approve restaurants at step 8 before Go Live.';
+  }
+  // Write a message
+  if(/write|message|email|draft|rédiger|écrire/.test(m)){
+    if(isFr)return 'Bien sûr ! Dites-moi à qui vous voulez écrire et le sujet, je rédigerai le message pour vous. Exemple : "Écris un message à Marco pour lui demander de changer le nom du store X."';
+    return 'Sure! Tell me who you want to write to and what about, and I\'ll draft it for you. Example: "Write a message to Marco asking him to change the name of store X."';
+  }
+  // Urbanpiper
+  if(/urbanpiper|urban piper/.test(m)){
+    if(isFr)return 'UrbanPiper est le logiciel tiers qui connecte les menus BranChef à Uber Eats. C\'est Zayd qui gère cette intégration (étape 5). Il reçoit la liste des stores de Saber et les connecte dans UrbanPiper.';
+    return 'UrbanPiper is the third-party software that connects BranChef menus to Uber Eats. Zayd handles this integration (step 5). He receives the store list from Saber and connects them in UrbanPiper.';
+  }
+  // Hello / greeting
+  if(/^(hi|hello|hey|bonjour|salut|yo|sup|hola)/.test(m)){
+    if(isFr)return 'Bonjour ! 👋 Je suis l\'assistant IA de BranChef. Posez-moi des questions sur les étapes d\'intégration, les rôles de l\'équipe, ou demandez-moi de rédiger un message !';
+    return 'Hey! 👋 I\'m the BranChef AI assistant. Ask me about onboarding steps, team roles, how the app works, or I can help you write a message!';
+  }
+  // Help
+  if(/help|aide|comment|how/.test(m)){
+    if(isFr)return 'Je peux vous aider avec :\n• Les 9 étapes d\'intégration\n• Les rôles de Saber, Zayd, Ritik, Marco\n• Comment fonctionne le Pipeline\n• Les demandes de tablette\n• Le pointage\n• Rédiger des messages ou emails\n• Tout ce qui concerne BranChef !';
+    return 'I can help you with:\n• The 9 onboarding steps\n• Roles of Saber, Zayd, Ritik, Marco\n• How the Pipeline works\n• Tablet requests\n• Clock In/Out\n• Writing messages or emails\n• Anything BranChef related!';
+  }
+  // Default
+  if(isFr)return 'Bonne question ! Je suis spécialisé dans BranChef — les étapes d\'intégration, les rôles de l\'équipe, le pipeline, les tablettes et le pointage. Pouvez-vous reformuler votre question en lien avec BranChef ?';
+  return 'Good question! I specialize in BranChef topics — onboarding steps, team roles, the pipeline, tablets, and clock tracking. Could you rephrase your question related to BranChef?';
 }
 
 // ==========================================
