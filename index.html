@@ -329,7 +329,6 @@ tbody tr:hover td{background:var(--gray-50);}
           <button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--brand);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button>
           <button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">🇫🇷 FR</button>
         </div>
-        
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
     </div>
@@ -485,23 +484,18 @@ function getPageTitle(id){
 }
 
 function applyLangUI(){
-  // Login screen
   var p=document.querySelector('.login-logo p');if(p)p.textContent=t('platform');
   var cl=document.querySelector('#captcha-wrap label');if(cl)cl.textContent=t('captcha_label');
   var ca=document.getElementById('captcha-ans');if(ca)ca.placeholder=t('captcha_placeholder');
   var lb=document.getElementById('login-btn');if(lb&&!lb.disabled)lb.textContent=t('signin');
   var fp=document.querySelector('button[onclick="showForgot()"]');if(fp)fp.textContent=t('forgot');
-  // Login screen lang buttons
   ['btn-lang-en','btn-lang-fr'].forEach(function(id){
-    var b=document.getElementById(id);
-    if(!b)return;
+    var b=document.getElementById(id);if(!b)return;
     if(id==='btn-lang-'+lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}
     else{b.style.background='var(--white)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}
   });
-  // Topbar lang buttons
   ['topbar-lang-en','topbar-lang-fr'].forEach(function(id){
-    var b=document.getElementById(id);
-    if(!b)return;
+    var b=document.getElementById(id);if(!b)return;
     var l=id.replace('topbar-lang-','');
     if(l===lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}
     else{b.style.background='var(--gray-100)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}
@@ -1107,10 +1101,16 @@ function completeStep(id,stepIndex){
 function renderTablet(){
   var pendingRows=tablets.filter(function(t){return t.status==='pending';}).map(function(t){
     return '<tr>'
-      +'<td><strong>'+esc(t.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(t.address)+'</div></td>'
+      +'<td>'
+        +'<strong>'+esc(t.restaurantName)+'</strong>'
+        +'<div style="font-size:12px;color:var(--gray-600);margin-top:2px;">👤 '+esc(t.ownerName||'—')+'</div>'
+        +'<div style="font-size:12px;color:var(--gray-600);">📞 '+esc(t.phone||'—')+'</div>'
+        +'<div style="font-size:12px;color:var(--gray-600);">📍 '+esc(t.address||'—')+'</div>'
+        +(t.notes?'<div style="font-size:12px;color:var(--gray-400);font-style:italic;margin-top:2px;">📝 '+esc(t.notes)+'</div>':'')
+      +'</td>'
       +'<td>'+esc(t.submittedBy)+'</td>'
       +'<td><span class="pill pill-pending">Pending</span></td>'
-      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="markShipped(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'<td></td>')
+      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="openShipModal(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">📦 Ship & Onboard</button></td>':'<td></td>')
       +'</tr>';
   }).join('');
 
@@ -1148,19 +1148,67 @@ function submitTablet(){
     submittedBy:CU.name,status:'pending',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    addNotif('tablet','📦 '+CU.name+' requested tablet for '+name+' — awaiting shipment');
-    sendEmail('Tablet Request', CU.name, '📦 '+CU.name+' requested tablet for: '+name+' | Address: '+addr);
+    addNotif('tablet','📦 '+CU.name+' requested tablet for '+name+' — awaiting shipment. Owner: '+owner+' | '+addr);
+    addNotif('system','📢 Saber & Zayd: new tablet request for '+name+' is pending — owners will ship soon, then onboarding begins!');
+    sendEmail('Tablet Request', CU.name, '📦 '+CU.name+' requested tablet for: '+name+' | Owner: '+owner+' | Phone: '+v('t-phone')+' | Address: '+addr+' | Notes: '+v('t-notes'));
     showToast('📦 Request sent! Owners notified.');
     ['t-name','t-owner','t-phone','t-addr','t-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   }).catch(function(e){showToast('❌ '+e.message);})
   .finally(function(){btn.disabled=false;btn.textContent='📦 Send tablet request';});
 }
 
-function markShipped(id,name){
-  db.collection('tablets').doc(id).update({status:'shipped'}).then(function(){
-    addNotif('tablet','📦 Tablet shipped to '+name);
-    showToast('📦 Marked as shipped!');
+function openShipModal(tabletId, restName){
+  var tab=tablets.find(function(t){return t.id===tabletId;});
+  if(!tab)return;
+  var brandsHtml='';
+  Object.keys(BRANDS).forEach(function(cat){
+    brandsHtml+='<div class="brand-cat"><div class="brand-cat-lbl">'+cat+'</div><div class="brand-chips">'
+      +BRANDS[cat].map(function(b){return '<div class="chip" onclick="this.classList.toggle(\'sel\')" data-val="'+esc(b)+'">'+esc(b)+'</div>';}).join('')
+      +'</div></div>';
   });
+  var body=document.getElementById('ma-body');
+  var detailHtml='<div style="margin-bottom:14px;">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--gray-800);margin-bottom:6px;">Restaurant details</div>'
+    +'<div style="font-size:13px;color:var(--gray-700);line-height:1.8;">'
+    +'🏪 <strong>'+esc(tab.restaurantName)+'</strong><br>'
+    +'👤 '+esc(tab.ownerName||'—')+'<br>'
+    +'📞 '+esc(tab.phone||'—')+'<br>'
+    +'📍 '+esc(tab.address||'—')+'<br>'
+    +(tab.notes?'📝 <em>'+esc(tab.notes)+'</em>':'')
+    +'</div></div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--gray-800);margin-bottom:8px;">Select virtual brands to activate</div>'
+    +'<div id="ship-brands">'+brandsHtml+'</div>'
+    +'<div style="margin-top:16px;display:flex;gap:10px;">'
+    +'<button class="btn btn-primary" style="flex:1;" id="btn-confirm-ship" onclick="confirmShip(\''+tabletId+'\',\''+esc(tab.restaurantName)+'\',\''+esc(tab.ownerName||'')+'\',\''+esc(tab.phone||'')+'\',\''+esc(tab.address||'')+'\')">📦 Confirm ship & start onboarding</button>'
+    +'<button class="btn btn-ghost" onclick="closeModal(\'modal-admin\')" style="flex:0 0 auto;">Cancel</button>'
+    +'</div>';
+  body.innerHTML=detailHtml;
+  document.getElementById('ma-title').textContent='📦 Ship tablet — '+restName;
+  openModal('modal-admin');
+}
+
+
+function confirmShip(tabletId,restName,ownerName,phone,address){
+  var brands=getSelChips('#ship-brands .chip');
+  var btn=event.target;btn.disabled=true;btn.textContent='Processing…';
+  // 1. Mark tablet shipped
+  db.collection('tablets').doc(tabletId).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name}).then(function(){
+    // 2. Create restaurant in pipeline at step 0, assigned to Saber
+    return db.collection('restaurants').add({
+      name:restName,ownerName:ownerName,phone:phone,address:address,
+      brands:brands,agent:'Saber',
+      status:'new',stepIndex:0,
+      submittedBy:CU.name,fromTablet:tabletId,
+      platforms:['Uber Eats'],
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).then(function(){
+    // 3. Notify everyone
+    addNotif('tablet','📦 Tablet shipped to '+restName+' — Saber & Zayd notified to begin onboarding');
+    addNotif('new','🏪 New restaurant ready for onboarding: '+restName+' ('+brands.join(', ')+') — assigned to Saber');
+    showToast('✅ Shipped! '+restName+' added to pipeline. Saber & Zayd notified.');
+    closeModal('modal-admin');
+  }).catch(function(e){showToast('❌ '+e.message);btn.disabled=false;btn.textContent='📦 Confirm ship & start onboarding';});
 }
 
 // ==========================================
