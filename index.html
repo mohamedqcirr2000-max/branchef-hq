@@ -325,7 +325,7 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
-        <button onclick="setLang(lang==='en'?'fr':'en');this.textContent=lang==='fr'?'🇫🇷 FR':'🇬🇧 EN'" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
+        <button onclick="setLang(lang==='en'?'fr':'en')" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
         <button onclick="toggleAIChat()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🤖 AI</button>
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
@@ -481,12 +481,12 @@ function t(key){ return (T[lang]&&T[lang][key]) ? T[lang][key] : (T['en'][key]||
 function setLang(l){
   lang=l;
   localStorage.setItem('bc_lang',l);
-  // Update lang buttons on login screen
+  // Update login screen buttons
   applyLangUI();
-  // Update topbar lang button (only exists when logged in)
+  // Update topbar button (lang is now set, so use it correctly)
   var tl=document.getElementById('topbar-lang');
-  if(tl)tl.textContent=l==='fr'?'🇫🇷 FR':'🇬🇧 EN';
-  // Only rebuild nav & re-render if user is logged in
+  if(tl)tl.textContent=lang==='fr'?'🇫🇷 FR':'🇬🇧 EN';
+  // Only rebuild if logged in
   if(!CU)return;
   buildNav();
   var active=document.querySelector('.sb-item.active');
@@ -1670,6 +1670,8 @@ function removeTyping(){var t=document.getElementById('ai-typing');if(t)t.remove
 
 var BRANCHEF_SYSTEM='You are the BranChef HQ AI assistant. BranChef is a virtual brand management company based in Montreal, Canada. It places multiple virtual brands inside physical restaurant locations and collects weekly commissions on delivery platform payouts (mainly Uber Eats, some DoorDash). The onboarding team consists of Saber (does most steps) and Zayd (UrbanPiper integration only). The 9-step onboarding process is: 1) Find empty Uber Eats store, 2) Fix address & pickup instructions, 3) Prepare Marco list & contact Ritik, 4) Ritik says DONE - send list to Marco, 5) Zayd does UrbanPiper integration, 6) Menu setup (language/prices/photos), 7) Update covers & mark Ready, 8) Owner review & approval, 9) Go Live & marketing. Sales team handles tablet requests. Owners (Nadir/Simo) can see everything and approve at step 8. You can also help write messages, emails, explain steps, translate things, or help with any work task. Answer questions about the platform, steps, team roles, or anything work-related. Be concise and friendly. If asked in French, answer in French.';
 
+var BRANCHEF_SYSTEM='You are the BranChef HQ internal assistant. BranChef is a virtual brand company in Montreal that places virtual food brands inside physical restaurants on Uber Eats. STRICT RULES: 1) Only answer questions related to BranChef work, the team, onboarding steps, restaurants, or the platform. 2) If someone asks about personal topics, general knowledge, celebrities, news, or anything not related to BranChef work - politely refuse and redirect them to work topics. 3) Never share private information about team members beyond their role. The 9 onboarding steps: 1-Find empty Uber Eats store, 2-Fix address & pickup instructions, 3-Prepare Marco list & contact Ritik, 4-Ritik confirms DONE then send list to Marco, 5-Zayd does UrbanPiper integration, 6-Saber does menu setup (Quebec=French, other=English, fix prices & photos), 7-Saber updates covers & marks Ready, 8-Nadir or Simo reviews & approves, 9-Go Live & marketing 1 by 1. Team: Saber=onboarding (all steps except UrbanPiper), Zayd=onboarding (UrbanPiper only), Nada/Chaimae/Ines=sales (tablet requests), Nadir/Simo=owners (see everything, approve step 8). Ritik=UrbanPiper contact. Marco=Uber Eats account manager. Answer in the same language the user writes in (French or English). Be concise and professional.';
+
 function sendAI(){
   var input=document.getElementById('ai-input');
   var btn=document.getElementById('ai-send-btn');
@@ -1679,14 +1681,42 @@ function sendAI(){
   input.value='';
   btn.disabled=true;
   addAIMsg('user',msg);
+  aiHistory.push({role:'user',content:msg});
   addAITyping();
-  // Simulate thinking delay
-  setTimeout(function(){
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-haiku-4-5-20251001',
+      max_tokens:600,
+      system:BRANCHEF_SYSTEM,
+      messages:aiHistory.slice(-8)
+    })
+  }).then(function(r){return r.json();}).then(function(data){
     removeTyping();
+    var reply='';
+    if(data.content&&data.content[0]&&data.content[0].text){
+      reply=data.content[0].text;
+    } else if(data.error){
+      reply=lang==='fr'?'❌ Erreur de connexion. Réessayez.':'❌ Connection error. Please try again.';
+    } else {
+      reply=lang==='fr'?'❌ Pas de réponse. Réessayez.':'❌ No response. Please try again.';
+    }
+    aiHistory.push({role:'assistant',content:reply});
+    addAIMsg('bot',reply);
+    btn.disabled=false;
+  }).catch(function(err){
+    removeTyping();
+    // Fallback to built-in answers if API fails
     var reply=getBranChefAIReply(msg);
     addAIMsg('bot',reply);
     btn.disabled=false;
-  },800+Math.random()*600);
+  });
 }
 
 function getBranChefAIReply(msg){
