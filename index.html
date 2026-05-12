@@ -273,7 +273,23 @@ tbody tr:hover td{background:var(--gray-50);}
     <div class="err" id="login-err"></div>
     <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="you@getbranchef.com" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
+    <!-- CAPTCHA -->
+    <div class="field" id="captcha-wrap">
+      <label style="font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Type the characters you see</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <canvas id="captcha-canvas" width="160" height="52" style="border-radius:8px;border:1.5px solid var(--gray-200);background:#f8f7ff;flex-shrink:0;"></canvas>
+        <button type="button" onclick="genCaptcha()" title="New code" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;width:36px;height:36px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">🔄</button>
+      </div>
+      <input type="text" id="captcha-ans" placeholder="Enter the code above" style="margin-top:8px;width:100%;padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;font-family:inherit;letter-spacing:3px;" maxlength="6" autocomplete="off" spellcheck="false">
+    </div>
     <button class="btn btn-primary btn-full" onclick="doLogin()" id="login-btn" style="margin-top:8px;">Sign in →</button>
+    <button onclick="showForgot()" style="background:none;border:none;cursor:pointer;color:var(--brand);font-size:13px;font-weight:600;margin-top:12px;width:100%;text-align:center;font-family:inherit;">Forgot password?</button>
+    <!-- FORGOT PASSWORD PANEL -->
+    <div id="forgot-panel" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-100);">
+      <div class="field"><label>Enter your email to reset password</label><input type="email" id="reset-email" placeholder="you@getbranchef.com"></div>
+      <button class="btn btn-ghost btn-full" onclick="sendReset()" id="reset-btn">📧 Send reset email</button>
+      <div id="reset-msg" style="margin-top:8px;font-size:13px;text-align:center;display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -1301,15 +1317,133 @@ function adminStats(){
 // ==========================================
 // AUTH
 // ==========================================
+// ==========================================
+// VISUAL CAPTCHA
+// ==========================================
+var captchaCode='';
+var captchaChars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function genCaptcha(){
+  captchaCode='';
+  for(var i=0;i<5;i++) captchaCode+=captchaChars[Math.floor(Math.random()*captchaChars.length)];
+  var ans=document.getElementById('captcha-ans');
+  if(ans)ans.value='';
+  drawCaptcha();
+}
+
+function drawCaptcha(){
+  var canvas=document.getElementById('captcha-canvas');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var w=canvas.width,h=canvas.height;
+
+  // Background gradient
+  var bg=ctx.createLinearGradient(0,0,w,h);
+  bg.addColorStop(0,'#f0ebff');
+  bg.addColorStop(1,'#e8f0ff');
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,w,h);
+
+  // Noise lines
+  for(var i=0;i<6;i++){
+    ctx.beginPath();
+    ctx.moveTo(Math.random()*w,Math.random()*h);
+    ctx.lineTo(Math.random()*w,Math.random()*h);
+    ctx.strokeStyle='rgba('+(100+Math.floor(Math.random()*100))+','+(100+Math.floor(Math.random()*100))+','+(180+Math.floor(Math.random()*60))+',0.35)';
+    ctx.lineWidth=1+Math.random();
+    ctx.stroke();
+  }
+
+  // Noise dots
+  for(var i=0;i<30;i++){
+    ctx.beginPath();
+    ctx.arc(Math.random()*w,Math.random()*h,Math.random()*2,0,Math.PI*2);
+    ctx.fillStyle='rgba(100,80,200,0.2)';
+    ctx.fill();
+  }
+
+  // Draw each character with random transforms
+  var colors=['#6B21FF','#9B22CC','#3B44CC','#2277AA','#7B3FEF'];
+  var fonts=['bold 26px Arial','bold 24px Georgia','bold 28px Verdana','bold 25px Courier New'];
+  ctx.save();
+  for(var i=0;i<captchaCode.length;i++){
+    ctx.save();
+    var x=16+i*28;
+    var y=34+Math.random()*6-3;
+    ctx.translate(x,y);
+    ctx.rotate((Math.random()-0.5)*0.4);
+    ctx.font=fonts[Math.floor(Math.random()*fonts.length)];
+    ctx.fillStyle=colors[Math.floor(Math.random()*colors.length)];
+    ctx.globalAlpha=0.85+Math.random()*0.15;
+    // Shadow for depth
+    ctx.shadowColor='rgba(100,50,200,0.3)';
+    ctx.shadowBlur=2;
+    ctx.fillText(captchaCode[i],0,0);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // Wavy overlay lines for distortion
+  for(var i=0;i<2;i++){
+    ctx.beginPath();
+    ctx.moveTo(0,h/2+(i-0.5)*12);
+    for(var x=0;x<w;x+=4){
+      ctx.lineTo(x,h/2+(i-0.5)*12+Math.sin(x/8+i)*4);
+    }
+    ctx.strokeStyle='rgba(120,80,220,0.15)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+}
+
+window.addEventListener('load',function(){setTimeout(genCaptcha,500);});
+
 function doLogin(){
   var email=document.getElementById('l-email').value.trim();
   var pass=document.getElementById('l-pass').value;
   var err=document.getElementById('login-err');
   var btn=document.getElementById('login-btn');
-  if(!TEAM[email]){err.textContent='❌ This email is not in the BranChef team.';err.style.display='block';return;}
+  var ans=document.getElementById('captcha-ans').value.trim().toUpperCase();
+  // CAPTCHA check
+  if(ans!==captchaCode){
+    err.textContent='❌ Wrong captcha code. Please try again.';
+    err.style.display='block';
+    genCaptcha();
+    return;
+  }
+  if(!TEAM[email]){err.textContent='❌ This email is not in the BranChef team.';err.style.display='block';genCaptcha();return;}
   err.style.display='none';btn.disabled=true;btn.textContent='Signing in…';
   auth.signInWithEmailAndPassword(email,pass)
-    .catch(function(){err.textContent='❌ Wrong password. Try again.';err.style.display='block';btn.disabled=false;btn.textContent='Sign in →';});
+    .catch(function(e){
+      var msg='❌ Wrong password. Try again.';
+      if(e.code==='auth/too-many-requests')msg='❌ Too many attempts. Try again in a few minutes.';
+      err.textContent=msg;err.style.display='block';
+      btn.disabled=false;btn.textContent='Sign in →';
+      genCaptcha();
+    });
+}
+
+function showForgot(){
+  var fp=document.getElementById('forgot-panel');
+  if(fp)fp.style.display=fp.style.display==='none'?'block':'none';
+}
+
+function sendReset(){
+  var email=document.getElementById('reset-email').value.trim();
+  var msg=document.getElementById('reset-msg');
+  var btn=document.getElementById('reset-btn');
+  if(!email){msg.textContent='⚠️ Enter your email first.';msg.style.color='var(--red)';msg.style.display='block';return;}
+  if(!TEAM[email]){msg.textContent='❌ This email is not registered in BranChef.';msg.style.color='var(--red)';msg.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Sending…';
+  auth.sendPasswordResetEmail(email).then(function(){
+    msg.textContent='✅ Reset email sent! Check your inbox.';
+    msg.style.color='var(--green)';msg.style.display='block';
+    btn.textContent='✅ Sent!';
+  }).catch(function(e){
+    msg.textContent='❌ Error: '+e.message;
+    msg.style.color='var(--red)';msg.style.display='block';
+    btn.disabled=false;btn.textContent='📧 Send reset email';
+  });
 }
 
 function doLogout(){
