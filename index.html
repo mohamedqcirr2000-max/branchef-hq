@@ -481,25 +481,25 @@ function t(key){ return (T[lang]&&T[lang][key]) ? T[lang][key] : (T['en'][key]||
 function setLang(l){
   lang=l;
   localStorage.setItem('bc_lang',l);
-  // Update topbar lang button
+  // Update lang buttons on login screen
+  applyLangUI();
+  // Update topbar lang button (only exists when logged in)
   var tl=document.getElementById('topbar-lang');
   if(tl)tl.textContent=l==='fr'?'🇫🇷 FR':'🇬🇧 EN';
-  // Rebuild nav with new labels
+  // Only rebuild nav & re-render if user is logged in
+  if(!CU)return;
   buildNav();
-  // Update page titles map
-  PAGE_TITLES={
-    dashboard:t('dashboard'),add:t('add_resto'),
-    pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',
-    tablet:t('tablet'),notifications:t('notifications'),
-    clock:t('clock'),team:t('team'),admin:t('admin')
-  };
-  // Re-render current page
   var active=document.querySelector('.sb-item.active');
   if(active){
     var id=active.id.replace('nav-','');
-    document.getElementById('topbar-title').textContent=PAGE_TITLES[id]||id;
+    document.getElementById('topbar-title').textContent=getPageTitle(id);
     showPage(id,active);
   }
+}
+
+function getPageTitle(id){
+  var titles={dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
+  return titles[id]||id;
 }
 
 function applyLangUI(){
@@ -662,7 +662,7 @@ function buildNav(){
     {id:'clock',ico:'clock',label:t('clock')},
   ];
   var NAV_MAP={owner:NAV_OWNER,onboarding:NAV_ONBOARDING,sales:NAV_SALES};
-  var items=NAV_MAP[CU?CU.role:'owner']||NAV_OWNER;
+  var items=NAV_MAP[(CU&&CU.role)||'owner']||NAV_OWNER;
   // Remember active page
   var activeId='dashboard';
   var cur=document.querySelector('.sb-item.active');
@@ -679,8 +679,7 @@ function buildNav(){
       +'</button>';
   });
   var nav=document.getElementById('sb-nav');
-  if(nav)nav.innerHTML=html;
-  updateBadge();
+  if(nav){nav.innerHTML=html; updateBadge();}
 }
 
 function svgIcon(name){
@@ -700,13 +699,13 @@ function svgIcon(name){
 // ==========================================
 // PAGE ROUTER
 // ==========================================
-var PAGE_TITLES={dashboard:'Dashboard',add:'Add Restaurant',pipeline:CU&&CU.role==='onboarding'?'My Restaurants':'Pipeline',tablet:'Tablet Request',notifications:'Notifications',clock:'Clock In/Out',team:'Team',admin:'Admin Panel'};
+var PAGE_TITLES={dashboard:'Dashboard',add:'Add Restaurant',pipeline:'Pipeline',tablet:'Tablet Request',notifications:'Notifications',clock:'Clock In/Out',team:'Team',admin:'Admin Panel'};
 
 function showPage(name,btn){
   document.querySelectorAll('.sb-item').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
   else{var nb=document.getElementById('nav-'+name);if(nb)nb.classList.add('active');}
-  document.getElementById('topbar-title').textContent=PAGE_TITLES[name]||name;
+  document.getElementById('topbar-title').textContent=getPageTitle(name);
   
   var renders={
     dashboard:renderDashboard,
