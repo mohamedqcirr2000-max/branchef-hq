@@ -711,6 +711,7 @@ function buildNav(){
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'My Work'},
     {id:'pipeline',ico:'list',label:t('my_restos')},
+    {id:'tablet',ico:'tablet',label:t('tablet_title')},
     {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -862,12 +863,26 @@ function renderDashboard(){
         return (stepDef&&stepDef.who===CU.name)||(r.agent===CU.name);
       });
   
-  var statsHtml='<div class="stats-row">'
-    +'<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
-    +'<div class="stat"><div class="stat-lbl">Pipeline</div><div class="stat-num">'+restaurants.filter(function(r){return r.status!=='live';}).length+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
-    +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
-    +(CU.role==='owner'?'<div class="stat"><div class="stat-lbl">Tablets</div><div class="stat-num">'+tablets.filter(function(t2){return t2.status==='pending';}).length+'</div><div class="stat-sub">'+t('pending')+'</div></div>':'')
-    +'</div>';
+  var myAssigned=myRest.length;
+  var myLiveCount=restaurants.filter(function(r){return r.agent===CU.name&&r.status==='live';}).length;
+  var statsHtml='<div class="stats-row">';
+  if(CU.role==='owner'){
+    statsHtml+=
+      '<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">Pipeline</div><div class="stat-num">'+restaurants.filter(function(r){return r.status!=='live';}).length+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">Tablets</div><div class="stat-num">'+tablets.filter(function(t2){return t2.status==='pending';}).length+'</div><div class="stat-sub">'+t('pending')+'</div></div>';
+  } else if(CU.role==='onboarding'){
+    statsHtml+=
+      '<div class="stat"><div class="stat-lbl">'+t('my_restos')+'</div><div class="stat-num">'+myAssigned+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+myLiveCount+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">Tablets</div><div class="stat-num">'+tablets.filter(function(t2){return t2.status==='pending';}).length+'</div><div class="stat-sub">'+t('pending')+'</div></div>';
+  } else {
+    statsHtml+=
+      '<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
+      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>';
+  }
+  statsHtml+='</div>';
 
   var myTasksHtml='';
   if(CU.role!=='sales'){
@@ -913,7 +928,7 @@ function renderDashActivity(){
   // Filter notifications by role
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='tablet'||n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return n.type==='tablet'||(n.type==='step'&&n.createdBy===CU.name)||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
     if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
@@ -1257,7 +1272,7 @@ function renderTablet(){
       +'</td>'
       +'<td>'+esc(tab.submittedBy)+'</td>'
       +'<td><span class="pill pill-pending">'+t('pending')+'</span></td>'
-      +((isOwner||CU.role==='onboarding')?'<td><button class="btn btn-success" onclick="openShipModal(\''+tab.id+'\',\''+esc(tab.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">'+(CU.role==='onboarding'?'🍔 Select Brands & Start':t('ship_onboard'))+'</button></td>':'<td></td>')
+      +((isOwner||CU.role==='onboarding')?'<td><button class="btn btn-success" onclick="openShipModal(\''+tab.id+'\',\''+esc(tab.restaurantName)+'\',\''+esc(tab.ownerName||'')+'\',\''+esc(tab.phone||'')+'\',\''+esc(tab.address||'')+'\'" style="font-size:11px;padding:5px 10px;">'+(CU.role==='onboarding'?'🍔 '+t('select_brands_start'):t('ship_onboard'))+'</button></td>':'<td></td>')
       +'</tr>';
   }).join('');
 
@@ -1378,7 +1393,7 @@ var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'�
 function renderNotifications(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='tablet'||n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return n.type==='tablet'||(n.type==='step'&&n.createdBy===CU.name)||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
     if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
@@ -1387,11 +1402,13 @@ function renderNotifications(){
       +'<div class="notif-ico">'+(ICONS[n.type]||'📢')+'</div>'
       +'<div class="notif-body"><div class="notif-txt">'+esc(n.message)+'</div><div class="notif-time">'+timeAgo(n.createdAt)+'</div></div>'
       +(n.read?'':'<div class="unread-dot"></div>')
+      +(CU.role==='owner'?'<button onclick="event.stopPropagation();deleteNotif(\''+n.id+'\')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--gray-300);font-size:16px;padding:4px 8px;flex-shrink:0;">🗑</button>':'')
       +'</div>';
   }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>'+t('no_notifs')+'</p></div>';
 
+  var clearBtn=CU.role==='owner'&&filtered.length?'<button onclick="clearAllNotifs()" style="background:none;border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">'+t('clear_all')+'</button>':'';
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>'+t('notif_title')+'</h2><p>'+t('notif_sub')+'</p></div>'
+    '<div class="page-hdr" style="display:flex;align-items:center;justify-content:space-between;"><div><h2>'+t('notif_title')+'</h2><p>'+t('notif_sub')+'</p></div>'+clearBtn+'</div>'
     +'<div class="card">'+html+'</div>';
 }
 
