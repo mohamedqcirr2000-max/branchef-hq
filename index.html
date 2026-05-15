@@ -1229,10 +1229,11 @@ function confirmBrandsAndStart(tabletId,restName,ownerName,phone,address){
 }
 
 function markShipped(id,name){
-  db.collection('tablets').doc(id).update({status:'shipped'}).then(function(){
-    addNotif('tablet','📦 Tablet shipped to '+name);
-    showToast('📦 Marked as shipped!');
-  });
+  db.collection('tablets').doc(id).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name})
+  .then(function(){
+    addNotif('tablet','📦 Tablet shipped to '+name+' — marked by '+CU.name);
+    showToast('📦 Shipped! Tablet is now in history.');
+  }).catch(function(e){showToast('❌ '+e.message);});
 }
 
 // ==========================================
@@ -1421,8 +1422,9 @@ function renderTeam(){
       var d=doc.data();
       var ts=d.lastSeen?d.lastSeen.toDate().getTime():0;
       var online=(now-ts)<90000;
+      var lastSeenStr=ts?d.lastSeen.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' ('+timeAgo(d.lastSeen)+')':'Never';
       var el=document.getElementById('presence-'+d.initials);
-      if(el)el.innerHTML='<div class="online-dot '+(online?'on':'off')+'"></div><span>'+(online?'Online now':'Offline')+'</span>';
+      if(el)el.innerHTML='<div class="online-dot '+(online?'on':'off')+'"></div><span style="font-size:12px;">'+(online?'🟢 Online now':'🔴 Last seen: '+lastSeenStr)+'</span>';
     });
   });
 }
@@ -1441,6 +1443,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminClock()"><div class="admin-card-ico">⏱</div><div class="admin-card-title">Clock Reports</div><div class="admin-card-desc">Full team attendance by date</div></div>'
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
+    +'<div class="admin-card" onclick="adminTablets()"><div class="admin-card-ico">📦</div><div class="admin-card-title">All Tablet Requests</div><div class="admin-card-desc">Full backup — pending, shipped, all history</div></div>'
     +'</div>';
 }
 
@@ -1457,6 +1460,47 @@ function adminRestaurants(){
   document.getElementById('ma-title').textContent='🏪 All Restaurants ('+restaurants.length+')';
   document.getElementById('ma-body').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Agent</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   openModal('modal-admin');
+}
+
+
+function adminTablets(){
+  // Fetch ALL tablets from Firestore directly (not just cached)
+  document.getElementById('ma-title').textContent='📦 All Tablet Requests';
+  document.getElementById('ma-body').innerHTML='<div class="spin" style="margin:20px auto;"></div>';
+  openModal('modal-admin');
+  db.collection('tablets').get().then(function(snap){
+    var all=[];
+    snap.forEach(function(doc){var d=doc.data();d.id=doc.id;all.push(d);});
+    // Sort by createdAt desc
+    all.sort(function(a,b){
+      var at=a.createdAt?a.createdAt.toDate().getTime():0;
+      var bt=b.createdAt?b.createdAt.toDate().getTime():0;
+      return bt-at;
+    });
+    if(!all.length){document.getElementById('ma-body').innerHTML='<p style="color:var(--gray-400);font-size:13px;">No tablet requests found.</p>';return;}
+    var statusColor={pending:'#92400E',shipped:'var(--brand)',brands_selected:'#065f46'};
+    var statusLabel={pending:'⏳ Pending',shipped:'📦 Shipped',brands_selected:'🍔 Brands picked'};
+    var rows=all.map(function(tb){
+      var st=tb.status||'pending';
+      var date=tb.createdAt?tb.createdAt.toDate().toLocaleDateString('en-CA'):'—';
+      var brands=(tb.brandsSelected||tb.brands||[]).join(', ')||'—';
+      var assignedTo=tb.assignedTo||tb.brandsSelectedBy||'—';
+      return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-500);">'+date+'</div></td>'        +'<td style="font-size:12px;"><div>👤 '+esc(tb.ownerName||'—')+'</div><div>📞 '+esc(tb.phone||'—')+'</div><div>📍 '+esc(tb.address||'—')+'</div>'+(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span style="font-size:11px;font-weight:700;color:'+(statusColor[st]||'#666')+';">'+(statusLabel[st]||st)+'</span></td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br>'+esc(assignedTo)+'</td>'        +'<td>'          +(st==='pending'?'<button onclick="adminMarkShipped(\''+tb.id+'\',\''+esc(tb.restaurantName||'')+'\')" class="btn btn-success" style="font-size:10px;padding:3px 8px;">📦 Ship</button>':'')          +'<button onclick="adminDeleteTablet(\''+tb.id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 8px;margin-top:2px;">🗑</button>'        +'</td>'        +'</tr>';
+    }).join('');
+    document.getElementById('ma-body').innerHTML=
+      '<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total requests</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>Submitted by</th><th>Status</th><th>Brands / Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }).catch(function(e){document.getElementById('ma-body').innerHTML='<p style="color:red;">Error: '+e.message+'</p>';});
+}
+
+function adminMarkShipped(id,name){
+  db.collection('tablets').doc(id).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name})
+  .then(function(){showToast('📦 Marked as shipped!');addNotif('tablet','📦 Tablet shipped to '+name);adminTablets();})
+  .catch(function(e){showToast('❌ '+e.message);});
+}
+
+function adminDeleteTablet(id){
+  if(!confirm('Delete this tablet request? This cannot be undone.'))return;
+  db.collection('tablets').doc(id).delete().then(function(){showToast('🗑 Deleted');adminTablets();}).catch(function(e){showToast('❌ '+e.message);});
 }
 
 function adminBrands(){
@@ -1488,21 +1532,28 @@ function adminClock(){
 
 function loadClockReport(){
   var date=document.getElementById('clock-date-picker').value;
+  var el=document.getElementById('clock-report-body');
+  if(el)el.innerHTML='<div class="spin" style="margin:0 auto;"></div>';
   db.collection('clock').where('date','==',date).get().then(function(snap){
-    var el=document.getElementById('clock-report-body');
     if(!el)return;
-    if(snap.empty){el.innerHTML='<p style="color:var(--gray-400);font-size:13px;">No entries for this date.</p>';return;}
-    var rows='';
-    snap.forEach(function(d){
-      var data=d.data();
-      var inT=data.clockIn?data.clockIn.toDate().toLocaleTimeString('en-CA',{hour12:false}):'–';
-      var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false}):'Not clocked out';
+    if(snap.empty){el.innerHTML='<p style="color:var(--gray-400);font-size:13px;padding:12px 0;">No entries for this date.</p>';return;}
+    var entries=[];
+    snap.forEach(function(d){entries.push(d.data());});
+    entries.sort(function(a,b){return (a.clockIn?a.clockIn.toDate().getTime():0)-(b.clockIn?b.clockIn.toDate().getTime():0);});
+    var totalMs=0;
+    var rows=entries.map(function(data){
+      var inT=data.clockIn?data.clockIn.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'–';
+      var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'🟢 Still in';
       var ms=data.clockOut&&data.clockIn?data.clockOut.toDate()-data.clockIn.toDate():0;
-      var dur=ms?(Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m'):'–';
-      rows+='<tr><td><strong>'+esc(data.userName)+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td><strong>'+dur+'</strong></td></tr>';
-    });
-    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Total</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-  });
+      totalMs+=ms;
+      var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
+      var dur=ms>=3600000?h+'h '+m+'m':ms>=60000?m+'m '+s+'s':ms>0?s+'s':'—';
+      return '<tr><td><strong>'+esc(data.userName||'—')+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td><strong>'+dur+'</strong></td></tr>';
+    }).join('');
+    var th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);
+    var totalStr=totalMs>0?(th>0?th+'h '+tm+'m':tm+'m'):'—';
+    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead><tbody>'+rows+'</tbody></table></div>'      +'<div style="text-align:right;font-size:12px;font-weight:700;color:var(--brand);padding:8px 0;">Team total: '+totalStr+'</div>';
+  }).catch(function(e){if(el)el.innerHTML='<p style="color:red;font-size:12px;">Error: '+e.message+'</p>';});
 }
 
 function adminEmailJS(){
