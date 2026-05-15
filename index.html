@@ -1137,28 +1137,106 @@ function submitTablet(){
 }
 
 function markShippedBtn(btn){
+  // Find the full tablet data from cache
   var id=btn.getAttribute('data-tid');
   var name=btn.getAttribute('data-tname');
   if(!id){showToast('❌ Missing tablet ID');return;}
-  btn.disabled=true;
-  btn.textContent='Shipping…';
-  db.collection('tablets').doc(id).update({
+  // Fetch full tablet data then open brand picker
+  db.collection('tablets').doc(id).get().then(function(doc){
+    if(!doc.exists){showToast('❌ Tablet not found');return;}
+    var tb=doc.data();tb.id=doc.id;
+    openShipBrandPicker(tb);
+  }).catch(function(e){showToast('❌ '+e.message);});
+}
+
+function openShipBrandPicker(tb){
+  // Build brand HTML safely using array join
+  var catKeys=Object.keys(BRANDS);
+  var bHtml=catKeys.map(function(cat){
+    var chips=BRANDS[cat].map(function(b){
+      return '<div class="chip" data-val="'+esc(b)+'" onclick="toggleChip(this)">'+esc(b)+'</div>';
+    }).join('');
+    return '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.5px;margin-bottom:6px;">'+cat+'</div><div class="brand-chips">'+chips+'</div></div>';
+  }).join('');
+
+  var existingBrands=tb.brandsSelected||tb.brands||[];
+  window._shipTablet=tb;
+
+  var infoHtml='<div style="background:var(--gray-100);border-radius:10px;padding:12px 14px;margin-bottom:14px;">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--gray-500);margin-bottom:6px;">Restaurant info</div>'
+    +'<div style="font-size:13px;color:var(--gray-800);line-height:1.9;">'
+    +'<strong>'+esc(tb.restaurantName||'—')+'</strong><br>'
+    +'👤 '+esc(tb.ownerName||'—')+'<br>'
+    +'📞 '+esc(tb.phone||'—')+'<br>'
+    +'📍 '+esc(tb.address||'—')
+    +(tb.notes?'<br>📝 <em>'+esc(tb.notes)+'</em>':'')
+    +'</div></div>';
+
+  document.getElementById('ma-body').innerHTML=infoHtml
+    +'<div style="font-size:13px;font-weight:700;color:var(--gray-800);margin-bottom:10px;">Select brands — Saber will start onboarding:</div>'
+    +'<div id="ship-brand-chips">'+bHtml+'</div>'
+    +'<button id="btn-confirm-ship" class="btn btn-primary btn-full" style="margin-top:16px;" onclick="confirmShipWithBrands()">📦 Confirm Ship & Add to Pipeline</button>';
+
+  document.getElementById('ma-title').textContent='📦 Ship — '+(tb.restaurantName||'');
+  openModal('modal-admin');
+
+  if(existingBrands.length){
+    setTimeout(function(){
+      document.querySelectorAll('#ship-brand-chips .chip').forEach(function(chip){
+        if(existingBrands.indexOf(chip.getAttribute('data-val'))>=0)chip.classList.add('sel');
+      });
+    },100);
+  }
+}
+
+function confirmShipWithBrands(){
+  var _t=window._shipTablet||{};
+  var tabletId=_t.id,restName=_t.restaurantName||'',ownerName=_t.ownerName||'',phone=_t.phone||'',address=_t.address||'';
+  if(!tabletId){showToast('❌ Tablet data missing');return;}
+  var brands=getSelChips('#ship-brand-chips .chip');
+  if(!brands.length){showToast('⚠️ Select at least one brand');return;}
+  var btn=document.getElementById('btn-confirm-ship');
+  if(btn){btn.disabled=true;btn.textContent='Processing…';}
+  // 1. Mark tablet as shipped
+  db.collection('tablets').doc(tabletId).update({
     status:'shipped',
     shippedAt:firebase.firestore.FieldValue.serverTimestamp(),
-    shippedBy:CU.name
+    shippedBy:CU.name,
+    brandsSelected:brands
   }).then(function(){
-    addNotif('tablet','📦 Tablet shipped to '+name+' — by '+CU.name);
-    showToast('📦 Shipped! '+name);
+    // 2. Create restaurant in Saber's pipeline
+    return db.collection('restaurants').add({
+      name:restName,
+      ownerName:ownerName,
+      phone:phone,
+      address:address,
+      brands:brands,
+      agent:'Saber',
+      status:'new',
+      stepIndex:0,
+      fromTablet:tabletId,
+      platforms:['Uber Eats'],
+      submittedBy:CU.name,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).then(function(){
+    // 3. Notify Saber
+    addNotif('tablet','📦 Tablet shipped to '+restName+' — brands: '+brands.join(', ')+' — Saber: start onboarding!');
+    showToast('✅ Shipped! '+restName+' added to pipeline.');
+    closeModal('modal-admin');
     renderTablet();
   }).catch(function(e){
-    alert('Firestore error: '+e.message);
     showToast('❌ '+e.message);
-    btn.disabled=false;
-    btn.textContent='Mark shipped';
+    if(btn){btn.disabled=false;btn.textContent='📦 Confirm Ship & Add to Pipeline';}
   });
 }
 
-function markShipped(ev,id,name){markShippedBtn({getAttribute:function(k){return k==='data-tid'?id:name;},disabled:false,textContent:''});}
+function markShipped(ev,id,name){
+  // Legacy fallback
+  db.collection('tablets').doc(id).get().then(function(doc){
+    if(doc.exists){var tb=doc.data();tb.id=doc.id;openShipBrandPicker(tb);}
+  });
+}
 
 // ==========================================
 // NOTIFICATIONS
@@ -1400,18 +1478,26 @@ function adminTablets(){
       var brands=(tb.brandsSelected||tb.brands||[]).join(', ')||'—';
       var agent=tb.assignedTo||tb.brandsSelectedBy||'—';
       var shippedInfo=tb.shippedAt?('<br>Shipped: '+tb.shippedAt.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' by '+(tb.shippedBy||'?')):'';
-      return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-400);">'+date+'</div></td>'        +'<td style="font-size:12px;">'          +'<div>👤 '+esc(tb.ownerName||'—')+'</div>'          +'<div>📞 '+esc(tb.phone||'—')+'</div>'          +'<div>📍 '+esc(tb.address||'—')+'</div>'          +(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span class="pill '+(pillMap[st]||'pill-new')+'">'+( labelMap[st]||st)+'</span>'+shippedInfo+'</td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br><em>'+esc(agent)+'</em></td>'        +'<td style="display:flex;flex-direction:column;gap:4px;">'          +(st==='pending'?'<button onclick="adminShipTablet(\''+tb._id+'\',\''+esc(tb.restaurantName||'')+'\')" class="btn btn-success" style="font-size:10px;padding:3px 7px;">📦 Ship</button>':'')          +'<button onclick="adminDelTablet(\''+tb._id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 7px;">🗑 Del</button>'        +'</td>'        +'</tr>';
+      return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-400);">'+date+'</div></td>'        +'<td style="font-size:12px;">'          +'<div>👤 '+esc(tb.ownerName||'—')+'</div>'          +'<div>📞 '+esc(tb.phone||'—')+'</div>'          +'<div>📍 '+esc(tb.address||'—')+'</div>'          +(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span class="pill '+(pillMap[st]||'pill-new')+'">'+( labelMap[st]||st)+'</span>'+shippedInfo+'</td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br><em>'+esc(agent)+'</em></td>'        +'<td style="display:flex;flex-direction:column;gap:4px;">'          +(st==='pending'?'<button data-tid="'+tb._id+'" data-tname="'+esc(tb.restaurantName||'')+'" onclick="adminShipBtn(this)" class="btn btn-success" style="font-size:10px;padding:3px 7px;">📦 Ship</button>':'')          +'<button onclick="adminDelTablet(\''+tb._id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 7px;">🗑 Del</button>'        +'</td>'        +'</tr>';
     }).join('');
     document.getElementById('ma-body').innerHTML=
       '<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total • '+all.filter(function(x){return x.status==='pending';}).length+' pending</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>By</th><th>Status</th><th>Brands/Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   }).catch(function(e){document.getElementById('ma-body').innerHTML='<p style="color:red;font-size:13px;">Error: '+e.message+'</p>';});
 }
 
+function adminShipBtn(btn){
+  var id=btn.getAttribute('data-tid');
+  var name=btn.getAttribute('data-tname');
+  adminShipTablet(id,name);
+}
+
 function adminShipTablet(id,name){
-  if(!confirm('Mark "'+name+'" as shipped?'))return;
-  db.collection('tablets').doc(id).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name})
-  .then(function(){addNotif('tablet','📦 Tablet shipped to '+name+' — by '+CU.name);showToast('📦 Shipped!');adminTablets();})
-  .catch(function(e){showToast('❌ '+e.message);});
+  // Open brand picker for this tablet
+  db.collection('tablets').doc(id).get().then(function(doc){
+    if(!doc.exists){showToast('❌ Not found');return;}
+    var tb=doc.data();tb.id=doc.id;
+    openShipBrandPicker(tb);
+  }).catch(function(e){showToast('❌ '+e.message);});
 }
 
 function adminDelTablet(id){
