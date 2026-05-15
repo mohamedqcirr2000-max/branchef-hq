@@ -245,7 +245,7 @@ tbody tr:hover td{background:var(--gray-50);}
   .sidebar{width:100%;height:60px;position:fixed;bottom:0;top:auto;border-right:none;border-top:1px solid var(--gray-100);flex-direction:row;z-index:200;background:var(--white);box-shadow:0 -2px 16px rgba(0,0,0,.07);}
   .sb-logo,.sb-user,.sb-section{display:none;}
   .sb-nav{display:flex;flex-direction:row;padding:0;gap:0;width:100%;overflow-x:hidden;align-items:stretch;}
-  .sb-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;font-weight:600;padding:6px 2px 4px;border-radius:0;min-width:0;color:var(--gray-400);border:none;background:none;line-height:1.1;}
+  .sb-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;font-weight:600;padding:6px 2px 4px;border-radius:0;min-width:0;color:var(--gray-400);border:none;background:none;}
   .sb-item.active{color:var(--brand);background:var(--brand-light);}
   .sb-item svg{width:20px;height:20px;flex-shrink:0;}
   .sb-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
@@ -329,7 +329,7 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
-        <div style="display:flex;gap:4px;align-items:center;"><button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--brand);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button><button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 11px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">🇫🇷 FR</button></div>
+        <div style="display:flex;gap:4px;"><button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 10px;border-radius:20px;border:1.5px solid var(--brand);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button><button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 10px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">🇫🇷 FR</button></div>
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
     </div>
@@ -465,7 +465,7 @@ var T = {
 
 function t(key){ return (T[lang]&&T[lang][key]) ? T[lang][key] : (T['en'][key]||key); }
 
-function setLang(l){lang=l;localStorage.setItem('bc_lang',l);applyLangUI();['topbar-lang-en','topbar-lang-fr'].forEach(function(id){var b=document.getElementById(id);if(!b)return;var l2=id.replace('topbar-lang-','');if(l2===lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}else{b.style.background='var(--gray-100)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}});if(!CU)return;buildNav();var active=document.querySelector('.sb-item.active');if(active){var id=active.id.replace('nav-','');document.getElementById('topbar-title').textContent=getPageTitle(id);showPage(id,active);}}
+function setLang(l){lang=l;localStorage.setItem('bc_lang',l);applyLangUI();['topbar-lang-en','topbar-lang-fr'].forEach(function(id){var b=document.getElementById(id);if(!b)return;var lc=id.replace('topbar-lang-','');if(lc===lang){b.style.background='var(--brand)';b.style.color='#fff';b.style.borderColor='var(--brand)';}else{b.style.background='var(--gray-100)';b.style.color='var(--gray-800)';b.style.borderColor='var(--gray-200)';}});if(!CU)return;buildNav();var active=document.querySelector('.sb-item.active');if(active){var id=active.id.replace('nav-','');document.getElementById('topbar-title').textContent=getPageTitle(id);showPage(id,active);}}
 
 function getPageTitle(id){
   var titles={dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
@@ -617,7 +617,6 @@ function buildNav(){
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'My Work'},
     {id:'pipeline',ico:'list',label:t('my_restos')},
-    {id:'tablet',ico:'tablet',label:'Tablet Requests'},
     {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -769,47 +768,17 @@ function renderDashboard(){
         return (stepDef&&stepDef.who===CU.name)||(r.agent===CU.name);
       });
   
-  var pendingTablets=tablets.filter(function(t2){return t2.status==='pending';}).length;
-  var myLiveCount=restaurants.filter(function(r){return r.agent===CU.name&&r.status==='live';}).length;
-  var statsHtml='<div class="stats-row">';
-  if(CU.role==='owner'){
-    statsHtml+='<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">Pipeline</div><div class="stat-num">'+restaurants.filter(function(r){return r.status!=='live';}).length+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">Tablets</div><div class="stat-num">'+pendingTablets+'</div><div class="stat-sub">'+t('pending')+'</div></div>';
-  }else if(CU.role==='onboarding'){
-    statsHtml+='<div class="stat"><div class="stat-lbl">My Pipeline</div><div class="stat-num">'+myRest.length+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+myLiveCount+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">New Tablets</div><div class="stat-num">'+pendingTablets+'</div><div class="stat-sub">Waiting</div></div>';
-  }else{
-    statsHtml+='<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
-      +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>';
-  }
-  statsHtml+='</div>';
+  var statsHtml='<div class="stats-row">'
+    +'<div class="stat"><div class="stat-lbl">'+t('partners')+'</div><div class="stat-num">'+restaurants.length+'</div><div class="stat-sub">'+t('total')+'</div></div>'
+    +'<div class="stat"><div class="stat-lbl">Pipeline</div><div class="stat-num">'+restaurants.filter(function(r){return r.status!=='live';}).length+'</div><div class="stat-sub">'+t('onboarding_pipe')+'</div></div>'
+    +'<div class="stat"><div class="stat-lbl">'+t('live')+'</div><div class="stat-num">'+restaurants.filter(function(r){return r.status==='live';}).length+'</div><div class="stat-sub">'+t('active_loc')+'</div></div>'
+    +(CU.role!=='sales'?'<div class="stat"><div class="stat-lbl">Tablets</div><div class="stat-num">'+tablets.filter(function(t2){return t2.status==='pending';}).length+'</div><div class="stat-sub">'+t('pending')+'</div></div>':'')
+    +'</div>';
 
   var myTasksHtml='';
   if(CU.role!=='sales'){
-    // For onboarding: show pending tablets at top as action items
-    var pendingTabletRows='';
-    if(CU.role==='onboarding'){
-      var pendingTabs=tablets.filter(function(tb){return tb.status==='pending';});
-      if(pendingTabs.length){
-        pendingTabletRows='<div style="background:#fff8e6;border:1.5px solid #ffd166;border-radius:10px;padding:12px 14px;margin-bottom:12px;">'
-          +'<div style="font-size:11px;font-weight:700;color:#92400E;letter-spacing:.5px;margin-bottom:8px;">📦 NEW TABLET REQUESTS — Select brands to start onboarding</div>'
-          +pendingTabs.map(function(tb){
-            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ffe8a0;">'
-              +'<div><div style="font-size:13px;font-weight:700;">'+esc(tb.restaurantName)+'</div>'
-              +'<div style="font-size:12px;color:#92400E;">👤 '+esc(tb.ownerName||'—')+' · 📞 '+esc(tb.phone||'—')+'</div>'
-              +'<div style="font-size:12px;color:#92400E;">📍 '+esc(tb.address||'—')+'</div></div>'
-              +'<button onclick="openBrandPicker(\''+tb.id+'\',\''+esc(tb.restaurantName)+'\',\''+esc(tb.ownerName||'')+'\',\''+esc(tb.phone||'')+'\',\''+esc(tb.address||'')+'\')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🍔 Select Brands</button>'
-              +'</div>';
-          }).join('')
-          +'</div>';
-      }
-    }
     myTasksHtml='<div class="sec-lbl">'+(CU.role==='owner'?t('active_pipe'):t('my_assign'))+'</div>'
       +'<div class="card"><div id="my-tasks-body">'
-      +pendingTabletRows
       +(myRest.length?'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Step</th><th></th></tr></thead><tbody>'
         +myRest.slice(0,5).map(function(r){
           var s=r.stepIndex||0;
@@ -817,7 +786,7 @@ function renderDashboard(){
             +'<td><span class="pill '+(STEP_PILLS[s]||'pill-new')+'">'+(STEP_LABELS[s]||'New')+'</span></td>'
             +'<td style="color:var(--gray-400);font-size:12px;">'+timeAgo(r.createdAt)+'</td></tr>';
         }).join('')+'</tbody></table></div>'
-        :(!pendingTabletRows?'<div class="empty" style="padding:1rem;"><p>'+t('no_assign')+'</p></div>':''))
+        :'<div class="empty" style="padding:1rem;"><p>'+t('no_assign')+'</p></div>')
       +'</div></div>';
   }
 
@@ -849,8 +818,8 @@ function renderDashActivity(){
   // Filter notifications by role
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='tablet'||(n.type==='step'&&n.createdBy===CU.name)||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return n.type==='tablet'||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
   if(!filtered.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
@@ -874,7 +843,7 @@ function renderOnlineGrid(){
       html+='<div class="online-card">'
         +'<div class="online-dot '+(online?'on':'off')+'"></div>'
         +'<div class="avatar '+(d.av||'av-purple')+'" style="width:24px;height:24px;font-size:10px;">'+esc(d.initials||'?')+'</div>'
-        +(CU&&CU.role==='owner'?'<span style="font-size:13px;font-weight:600;">'+esc(d.name)+'</span>':'')
+        +'<span style="font-size:13px;font-weight:600;">'+esc(d.name)+'</span>'
         +'</div>';
     });
     if(el)el.innerHTML=html||'<p style="color:var(--gray-400);font-size:13px;">No one online yet</p>';
@@ -883,7 +852,7 @@ function renderOnlineGrid(){
 
 function renderClockLogDash(){
   var today=new Date().toISOString().slice(0,10);
-  db.collection('clock').where('date','==',today).get().then(function(snap){
+  db.collection('clock').where('date','==',today).orderBy('clockIn','desc').get().then(function(snap){
     var el=document.getElementById('clock-log-dash');
     if(!el)return;
     if(snap.empty){el.innerHTML='<div class="card-body" style="color:var(--gray-400);font-size:13px;">No clock entries today.</div>';return;}
@@ -1116,23 +1085,19 @@ function completeStep(id,stepIndex){
 // TABLET
 // ==========================================
 function renderTablet(){
-  var isOwner=CU.role==='owner';
-  var isOnboarding=CU.role==='onboarding';
-  var pendingRows=tablets.filter(function(tb){return tb.status==='pending';}).map(function(tb){
+  var pendingRows=tablets.filter(function(t){return t.status==='pending';}).map(function(t){
     return '<tr>'
-      +'<td><div style="font-weight:700;">'+esc(tb.restaurantName)+'</div>'
-        +'<div style="font-size:12px;color:var(--gray-600);line-height:1.8;">👤 '+esc(tb.ownerName||'—')+'<br>📞 '+esc(tb.phone||'—')+'<br>📍 '+esc(tb.address||'—')+(tb.notes?'<br>📝 '+esc(tb.notes):'')+'</div></td>'
-      +'<td>'+esc(tb.submittedBy)+'</td>'
+      +'<td><strong>'+esc(t.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(t.address)+'</div></td>'
+      +'<td>'+esc(t.submittedBy)+'</td>'
       +'<td><span class="pill pill-pending">Pending</span></td>'
-      +(isOwner?'<td><button class="btn btn-success" onclick="markShipped(\''+tb.id+'\',\''+esc(tb.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">📦 Mark shipped</button></td>'
-        :isOnboarding?'<td><button class="btn btn-primary" onclick="openBrandPicker(\''+tb.id+'\',\''+esc(tb.restaurantName)+'\',\''+esc(tb.ownerName||'')+'\',\''+esc(tb.phone||'')+'\',\''+esc(tb.address||'')+'\')" style="font-size:11px;padding:5px 10px;">🍔 Select Brands</button></td>'
-        :'<td></td>')
+      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="markShipped(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'<td></td>')
       +'</tr>';
   }).join('');
 
-  var formHtml='';
-  if(!isOnboarding){
-    formHtml='<div class="card"><div class="card-hdr"><div class="card-title">📦 New tablet request</div></div><div class="card-body">'
+  document.getElementById('content').innerHTML=
+    '<div class="page-hdr"><h2>Tablet Request</h2><p>Submit when a restaurant confirms they want a tablet.</p></div>'
+    +'<div class="g2">'
+    +'<div class="card"><div class="card-hdr"><div class="card-title">📦 New tablet request</div></div><div class="card-body">'
     +'<div class="field"><label>Restaurant name *</label><input id="t-name" type="text" placeholder="Restaurant name"></div>'
     +'<div class="field-row">'
     +'<div class="field"><label>Owner name *</label><input id="t-owner" type="text" placeholder="Owner full name"></div>'
@@ -1141,15 +1106,9 @@ function renderTablet(){
     +'<div class="field"><label>Delivery address *</label><input id="t-addr" type="text" placeholder="Full address for tablet delivery"></div>'
     +'<div class="field"><label>Notes</label><textarea id="t-notes" placeholder="Best time, special instructions…"></textarea></div>'
     +'<button class="btn btn-primary btn-full" onclick="submitTablet()" id="btn-tablet" style="margin-top:8px;">📦 Send tablet request</button>'
-    +'</div></div>';
-  }
-
-  document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Tablet Requests</h2><p>'+(isOnboarding?'Select brands for new requests to start onboarding.':'Submit when a restaurant confirms they want a tablet.')+'</p></div>'
-    +'<div class="g2">'
-    +formHtml
+    +'</div></div>'
     +'<div>'
-    +'<div class="sec-lbl">Pending requests ('+tablets.filter(function(tb){return tb.status==='pending';}).length+')</div>'
+    +'<div class="sec-lbl">Pending requests ('+tablets.filter(function(t){return t.status==='pending';}).length+')</div>'
     +'<div class="card">'
     +(pendingRows?'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Submitted by</th><th>Status</th><th></th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>'
       :'<div class="empty" style="padding:1.5rem;"><p>No pending requests 🎉</p></div>')
@@ -1169,7 +1128,7 @@ function submitTablet(){
     submittedBy:CU.name,status:'pending',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    addNotif('tablet','📦 '+CU.name+' → '+name+' | 👤 '+owner+' | 📞 '+(v('t-phone')||'—')+' | 📍 '+addr+(v('t-notes')?' | 📝 '+v('t-notes'):''));
+    addNotif('tablet','📦 '+CU.name+' requested tablet for '+name+' — awaiting shipment');
     sendEmail('Tablet Request', CU.name, '📦 '+CU.name+' requested tablet for: '+name+' | Address: '+addr);
     showToast('📦 Request sent! Owners notified.');
     ['t-name','t-owner','t-phone','t-addr','t-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
@@ -1177,63 +1136,21 @@ function submitTablet(){
   .finally(function(){btn.disabled=false;btn.textContent='📦 Send tablet request';});
 }
 
-
-function openBrandPicker(tabletId,restName,ownerName,phone,address){
-  var brandsHtml='';
-  Object.keys(BRANDS).forEach(function(cat){
-    brandsHtml+='<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.5px;margin-bottom:6px;">'+cat+'</div><div class="brand-chips">'
-      +BRANDS[cat].map(function(b){return '<div class="chip" onclick="this.classList.toggle(\'sel\')" data-val="'+esc(b)+'">'+esc(b)+'</div>';}).join('')
-      +'</div></div>';
-  });
-  var body=document.getElementById('ma-body');
-  body.innerHTML=
-    '<div style="background:var(--gray-100);border-radius:10px;padding:12px 14px;margin-bottom:16px;">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--gray-500);margin-bottom:6px;">Restaurant details</div>'
-    +'<div style="font-size:13px;color:var(--gray-800);line-height:1.9;">'
-    +'🏪 <strong>'+esc(restName)+'</strong><br>'
-    +'👤 '+esc(ownerName||'—')+'<br>'
-    +'📞 '+esc(phone||'—')+'<br>'
-    +'📍 '+esc(address||'—')
-    +'</div></div>'
-    +'<div style="font-size:13px;font-weight:700;color:var(--gray-800);margin-bottom:10px;">Select virtual brands to activate:</div>'
-    +'<div id="brand-picker-chips">'+brandsHtml+'</div>'
-    +'<div style="margin-top:16px;display:flex;gap:10px;">'
-    +'<button class="btn btn-primary" style="flex:1;" onclick="confirmBrandsAndStart(\''+tabletId+'\',\''+esc(restName)+'\',\''+esc(ownerName||'')+'\',\''+esc(phone||'')+'\',\''+esc(address||'')+'\')">✅ Confirm & Start Onboarding</button>'
-    +'<button class="btn btn-ghost" onclick="closeModal(\'modal-admin\')" style="flex:0 0 auto;">Cancel</button>'
-    +'</div>';
-  document.getElementById('ma-title').textContent='🍔 Select Brands — '+restName;
-  openModal('modal-admin');
-}
-
-function confirmBrandsAndStart(tabletId,restName,ownerName,phone,address){
-  var brands=getSelChips('#brand-picker-chips .chip');
-  if(!brands.length){showToast('⚠️ Select at least one brand');return;}
-  var btn=document.querySelector('#ma-body .btn-primary');
-  if(btn){btn.disabled=true;btn.textContent='Creating…';}
-  db.collection('restaurants').add({
-    name:restName,ownerName:ownerName,phone:phone,address:address,
-    brands:brands,agent:CU.name,status:'new',stepIndex:0,
-    fromTablet:tabletId,platforms:['Uber Eats'],
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){
-    return db.collection('tablets').doc(tabletId).update({brandsSelected:brands,assignedTo:CU.name});
-  }).then(function(){
-    addNotif('new','🏪 '+restName+' added to pipeline with brands: '+brands.join(', ')+' — '+CU.name+' starts onboarding!');
-    showToast('✅ '+restName+' added to your pipeline!');
-    closeModal('modal-admin');
-    showPage('pipeline',document.getElementById('nav-pipeline'));
-  }).catch(function(e){
-    showToast('❌ '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='✅ Confirm & Start Onboarding';}
-  });
-}
-
 function markShipped(id,name){
-  db.collection('tablets').doc(id).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name})
-  .then(function(){
-    addNotif('tablet','📦 Tablet shipped to '+name+' — marked by '+CU.name);
-    showToast('📦 Shipped! Tablet is now in history.');
-  }).catch(function(e){showToast('❌ '+e.message);});
+  var btn=event&&event.target?event.target:null;
+  if(btn){btn.disabled=true;btn.textContent='Shipping…';}
+  db.collection('tablets').doc(id).update({
+    status:'shipped',
+    shippedAt:firebase.firestore.FieldValue.serverTimestamp(),
+    shippedBy:CU.name
+  }).then(function(){
+    addNotif('tablet','📦 Tablet shipped to '+name+' — by '+CU.name);
+    showToast('📦 Shipped! '+name);
+    renderTablet();
+  }).catch(function(e){
+    showToast('❌ Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Mark shipped';}
+  });
 }
 
 // ==========================================
@@ -1244,8 +1161,8 @@ var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'�
 function renderNotifications(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='tablet'||(n.type==='step'&&n.createdBy===CU.name)||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return n.type==='tablet'||n.type==='new'||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
   var html=filtered.length?filtered.map(function(n){
@@ -1253,19 +1170,15 @@ function renderNotifications(){
       +'<div class="notif-ico">'+(ICONS[n.type]||'📢')+'</div>'
       +'<div class="notif-body"><div class="notif-txt">'+esc(n.message)+'</div><div class="notif-time">'+timeAgo(n.createdAt)+'</div></div>'
       +(n.read?'':'<div class="unread-dot"></div>')
-      +(CU.role==='owner'?'<button onclick="event.stopPropagation();deleteNotif(\''+n.id+'\')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--gray-300);font-size:16px;padding:4px 8px;flex-shrink:0;">🗑</button>':'')
       +'</div>';
   }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>No notifications yet</p></div>';
 
-  var clearBtn=CU.role==='owner'&&filtered.length?'<button onclick="clearAllNotifs()" style="background:none;border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">🗑️ Clear all</button>':'';
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr" style="display:flex;align-items:center;justify-content:space-between;"><div><h2>Notifications</h2><p>Your activity feed.</p></div>'+clearBtn+'</div>'
+    '<div class="page-hdr"><h2>Notifications</h2><p>Your activity feed.</p></div>'
     +'<div class="card">'+html+'</div>';
 }
 
 function markRead(id){db.collection('notifications').doc(id).update({read:true});}
-function deleteNotif(id){if(CU.role!=='owner')return;db.collection('notifications').doc(id).delete().catch(function(e){showToast('❌ '+e.message);});}
-function clearAllNotifs(){if(CU.role!=='owner')return;if(!confirm('Clear all notifications?'))return;var b=db.batch();notifs.forEach(function(n){b.delete(db.collection('notifications').doc(n.id));});b.commit().then(function(){showToast('🗑️ Done!');}).catch(function(e){showToast('❌ '+e.message);});}
 
 function updateBadge(){
   var u=notifs.filter(function(n){return !n.read;}).length;
@@ -1424,7 +1337,7 @@ function renderTeam(){
       var online=(now-ts)<90000;
       var lastSeenStr=ts?d.lastSeen.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' ('+timeAgo(d.lastSeen)+')':'Never';
       var el=document.getElementById('presence-'+d.initials);
-      if(el)el.innerHTML='<div class="online-dot '+(online?'on':'off')+'"></div><span style="font-size:12px;">'+(online?'🟢 Online now':'🔴 Last seen: '+lastSeenStr)+'</span>';
+      if(el)el.innerHTML='<div class="online-dot '+(online?'on':'off')+'"></div><span style="font-size:12px;">'+(online?'🟢 Online':'🔴 '+lastSeenStr)+'</span>';
     });
   });
 }
@@ -1443,7 +1356,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminClock()"><div class="admin-card-ico">⏱</div><div class="admin-card-title">Clock Reports</div><div class="admin-card-desc">Full team attendance by date</div></div>'
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
-    +'<div class="admin-card" onclick="adminTablets()"><div class="admin-card-ico">📦</div><div class="admin-card-title">All Tablet Requests</div><div class="admin-card-desc">Full backup — pending, shipped, all history</div></div>'
+    +'<div class="admin-card" onclick="adminTablets()"><div class="admin-card-ico">📦</div><div class="admin-card-title">All Tablet Requests</div><div class="admin-card-desc">Full history — pending, shipped, all 20+</div></div>'
     +'</div>';
 }
 
@@ -1464,43 +1377,41 @@ function adminRestaurants(){
 
 
 function adminTablets(){
-  // Fetch ALL tablets from Firestore directly (not just cached)
   document.getElementById('ma-title').textContent='📦 All Tablet Requests';
-  document.getElementById('ma-body').innerHTML='<div class="spin" style="margin:20px auto;"></div>';
+  document.getElementById('ma-body').innerHTML='<div style="text-align:center;padding:20px;"><div class="spin" style="margin:0 auto;"></div><p style="color:var(--gray-400);margin-top:10px;font-size:13px;">Loading all requests…</p></div>';
   openModal('modal-admin');
   db.collection('tablets').get().then(function(snap){
     var all=[];
-    snap.forEach(function(doc){var d=doc.data();d.id=doc.id;all.push(d);});
-    // Sort by createdAt desc
-    all.sort(function(a,b){
-      var at=a.createdAt?a.createdAt.toDate().getTime():0;
-      var bt=b.createdAt?b.createdAt.toDate().getTime():0;
-      return bt-at;
-    });
+    snap.forEach(function(doc){var d=doc.data();d._id=doc.id;all.push(d);});
+    all.sort(function(a,b){var at=a.createdAt?a.createdAt.toDate().getTime():0,bt=b.createdAt?b.createdAt.toDate().getTime():0;return bt-at;});
     if(!all.length){document.getElementById('ma-body').innerHTML='<p style="color:var(--gray-400);font-size:13px;">No tablet requests found.</p>';return;}
-    var statusColor={pending:'#92400E',shipped:'var(--brand)',brands_selected:'#065f46'};
-    var statusLabel={pending:'⏳ Pending',shipped:'📦 Shipped',brands_selected:'🍔 Brands picked'};
+    var pillMap={pending:'pill-pending',shipped:'pill-live',brands_selected:'pill-new'};
+    var labelMap={pending:'⏳ Pending',shipped:'📦 Shipped',brands_selected:'🍔 In onboarding'};
     var rows=all.map(function(tb){
       var st=tb.status||'pending';
       var date=tb.createdAt?tb.createdAt.toDate().toLocaleDateString('en-CA'):'—';
       var brands=(tb.brandsSelected||tb.brands||[]).join(', ')||'—';
-      var assignedTo=tb.assignedTo||tb.brandsSelectedBy||'—';
-      return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-500);">'+date+'</div></td>'        +'<td style="font-size:12px;"><div>👤 '+esc(tb.ownerName||'—')+'</div><div>📞 '+esc(tb.phone||'—')+'</div><div>📍 '+esc(tb.address||'—')+'</div>'+(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span style="font-size:11px;font-weight:700;color:'+(statusColor[st]||'#666')+';">'+(statusLabel[st]||st)+'</span></td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br>'+esc(assignedTo)+'</td>'        +'<td>'          +(st==='pending'?'<button onclick="adminMarkShipped(\''+tb.id+'\',\''+esc(tb.restaurantName||'')+'\')" class="btn btn-success" style="font-size:10px;padding:3px 8px;">📦 Ship</button>':'')          +'<button onclick="adminDeleteTablet(\''+tb.id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 8px;margin-top:2px;">🗑</button>'        +'</td>'        +'</tr>';
+      var agent=tb.assignedTo||tb.brandsSelectedBy||'—';
+      var shippedInfo=tb.shippedAt?('<br>Shipped: '+tb.shippedAt.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' by '+(tb.shippedBy||'?')):'';
+      return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-400);">'+date+'</div></td>'        +'<td style="font-size:12px;">'          +'<div>👤 '+esc(tb.ownerName||'—')+'</div>'          +'<div>📞 '+esc(tb.phone||'—')+'</div>'          +'<div>📍 '+esc(tb.address||'—')+'</div>'          +(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span class="pill '+(pillMap[st]||'pill-new')+'">'+( labelMap[st]||st)+'</span>'+shippedInfo+'</td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br><em>'+esc(agent)+'</em></td>'        +'<td style="display:flex;flex-direction:column;gap:4px;">'          +(st==='pending'?'<button onclick="adminShipTablet(\''+tb._id+'\',\''+esc(tb.restaurantName||'')+'\')" class="btn btn-success" style="font-size:10px;padding:3px 7px;">📦 Ship</button>':'')          +'<button onclick="adminDelTablet(\''+tb._id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 7px;">🗑 Del</button>'        +'</td>'        +'</tr>';
     }).join('');
     document.getElementById('ma-body').innerHTML=
-      '<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total requests</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>Submitted by</th><th>Status</th><th>Brands / Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-  }).catch(function(e){document.getElementById('ma-body').innerHTML='<p style="color:red;">Error: '+e.message+'</p>';});
+      '<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total • '+all.filter(function(x){return x.status==='pending';}).length+' pending</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>By</th><th>Status</th><th>Brands/Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }).catch(function(e){document.getElementById('ma-body').innerHTML='<p style="color:red;font-size:13px;">Error: '+e.message+'</p>';});
 }
 
-function adminMarkShipped(id,name){
+function adminShipTablet(id,name){
+  if(!confirm('Mark "'+name+'" as shipped?'))return;
   db.collection('tablets').doc(id).update({status:'shipped',shippedAt:firebase.firestore.FieldValue.serverTimestamp(),shippedBy:CU.name})
-  .then(function(){showToast('📦 Marked as shipped!');addNotif('tablet','📦 Tablet shipped to '+name);adminTablets();})
+  .then(function(){addNotif('tablet','📦 Tablet shipped to '+name+' — by '+CU.name);showToast('📦 Shipped!');adminTablets();})
   .catch(function(e){showToast('❌ '+e.message);});
 }
 
-function adminDeleteTablet(id){
-  if(!confirm('Delete this tablet request? This cannot be undone.'))return;
-  db.collection('tablets').doc(id).delete().then(function(){showToast('🗑 Deleted');adminTablets();}).catch(function(e){showToast('❌ '+e.message);});
+function adminDelTablet(id){
+  if(!confirm('Permanently delete this tablet request?'))return;
+  db.collection('tablets').doc(id).delete()
+  .then(function(){showToast('🗑 Deleted');adminTablets();})
+  .catch(function(e){showToast('❌ '+e.message);});
 }
 
 function adminBrands(){
@@ -1551,8 +1462,7 @@ function loadClockReport(){
       return '<tr><td><strong>'+esc(data.userName||'—')+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td><strong>'+dur+'</strong></td></tr>';
     }).join('');
     var th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);
-    var totalStr=totalMs>0?(th>0?th+'h '+tm+'m':tm+'m'):'—';
-    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead><tbody>'+rows+'</tbody></table></div>'      +'<div style="text-align:right;font-size:12px;font-weight:700;color:var(--brand);padding:8px 0;">Team total: '+totalStr+'</div>';
+    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead><tbody>'+rows+'</tbody></table></div>'      +(totalMs>0?'<div style="text-align:right;font-size:12px;font-weight:700;color:var(--brand);padding:8px 4px;">Team total: '+th+'h '+tm+'m</div>':'');
   }).catch(function(e){if(el)el.innerHTML='<p style="color:red;font-size:12px;">Error: '+e.message+'</p>';});
 }
 
