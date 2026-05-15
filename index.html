@@ -1480,9 +1480,76 @@ function adminTablets(){
       var shippedInfo=tb.shippedAt?('<br>Shipped: '+tb.shippedAt.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'})+' by '+(tb.shippedBy||'?')):'';
       return '<tr>'        +'<td><strong>'+esc(tb.restaurantName||'—')+'</strong><div style="font-size:11px;color:var(--gray-400);">'+date+'</div></td>'        +'<td style="font-size:12px;">'          +'<div>👤 '+esc(tb.ownerName||'—')+'</div>'          +'<div>📞 '+esc(tb.phone||'—')+'</div>'          +'<div>📍 '+esc(tb.address||'—')+'</div>'          +(tb.notes?'<div style="color:var(--gray-400);">📝 '+esc(tb.notes)+'</div>':'')+'</td>'        +'<td style="font-size:12px;">'+esc(tb.submittedBy||'—')+'</td>'        +'<td><span class="pill '+(pillMap[st]||'pill-new')+'">'+( labelMap[st]||st)+'</span>'+shippedInfo+'</td>'        +'<td style="font-size:11px;color:var(--gray-500);">'+esc(brands)+'<br><em>'+esc(agent)+'</em></td>'        +'<td style="display:flex;flex-direction:column;gap:4px;">'          +(st==='pending'?'<button data-tid="'+tb._id+'" data-tname="'+esc(tb.restaurantName||'')+'" onclick="adminShipBtn(this)" class="btn btn-success" style="font-size:10px;padding:3px 7px;">📦 Ship</button>':'')          +'<button onclick="adminDelTablet(\''+tb._id+'\')" class="btn btn-danger" style="font-size:10px;padding:3px 7px;">🗑 Del</button>'        +'</td>'        +'</tr>';
     }).join('');
+    var shippedNoBrands=all.filter(function(x){return x.status==='shipped'&&!(x.brandsSelected&&x.brandsSelected.length);}).length;
+    var syncBtn=shippedNoBrands>0?'<button onclick="syncAllToPipeline()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px;">⚡ Sync '+shippedNoBrands+' shipped tablets → Pipeline</button><br>':'';
     document.getElementById('ma-body').innerHTML=
-      '<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total • '+all.filter(function(x){return x.status==='pending';}).length+' pending</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>By</th><th>Status</th><th>Brands/Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      syncBtn+'<p style="font-size:12px;color:var(--gray-400);margin-bottom:12px;">'+all.length+' total • '+all.filter(function(x){return x.status==='pending';}).length+' pending</p>'      +'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Info</th><th>By</th><th>Status</th><th>Brands/Agent</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   }).catch(function(e){document.getElementById('ma-body').innerHTML='<p style="color:red;font-size:13px;">Error: '+e.message+'</p>';});
+}
+
+
+function syncAllToPipeline(){
+  if(!confirm('This will add ALL shipped tablets to Saber\'s pipeline (as new restaurants at Step 0). Continue?'))return;
+  var btn=event.target;
+  btn.disabled=true;btn.textContent='Syncing…';
+
+  // Get all tablets + all existing restaurants (to avoid duplicates by fromTablet)
+  Promise.all([
+    db.collection('tablets').where('status','==','shipped').get(),
+    db.collection('restaurants').get()
+  ]).then(function(results){
+    var tabSnap=results[0], restSnap=results[1];
+    // Build set of tablet IDs already in pipeline
+    var existing=new Set();
+    restSnap.forEach(function(d){
+      var ft=d.data().fromTablet;
+      if(ft)existing.add(ft);
+    });
+
+    // Filter tablets not yet in pipeline
+    var toAdd=[];
+    tabSnap.forEach(function(d){
+      var tb=d.data();tb.id=d.id;
+      if(!existing.has(tb.id))toAdd.push(tb);
+    });
+
+    if(!toAdd.length){
+      showToast('✅ All tablets already in pipeline!');
+      btn.disabled=false;btn.textContent='✅ Already synced';
+      return;
+    }
+
+    // Add all missing restaurants in batch
+    var batch=db.batch();
+    toAdd.forEach(function(tb){
+      var ref=db.collection('restaurants').doc();
+      batch.set(ref,{
+        name:tb.restaurantName||'Unknown',
+        ownerName:tb.ownerName||'',
+        phone:tb.phone||'',
+        address:tb.address||'',
+        brands:tb.brandsSelected||tb.brands||[],
+        agent:'Saber',
+        status:'new',
+        stepIndex:0,
+        fromTablet:tb.id,
+        platforms:['Uber Eats'],
+        submittedBy:tb.submittedBy||'',
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    return batch.commit().then(function(){
+      addNotif('new','⚡ '+toAdd.length+' restaurants synced to pipeline — Saber & Zayd: start onboarding!');
+      showToast('✅ '+toAdd.length+' restaurants added to pipeline!');
+      btn.textContent='✅ Synced '+toAdd.length;
+      // Refresh tablets list
+      setTimeout(adminTablets, 800);
+    });
+  }).catch(function(e){
+    showToast('❌ '+e.message);
+    btn.disabled=false;btn.textContent='⚡ Retry sync';
+  });
 }
 
 function adminShipBtn(btn){
