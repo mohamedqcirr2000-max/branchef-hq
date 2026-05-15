@@ -852,7 +852,7 @@ function renderOnlineGrid(){
 
 function renderClockLogDash(){
   var today=new Date().toISOString().slice(0,10);
-  db.collection('clock').where('date','==',today).orderBy('clockIn','desc').get().then(function(snap){
+  db.collection('clock').where('date','==',today).get().then(function(snap){
     var el=document.getElementById('clock-log-dash');
     if(!el)return;
     if(snap.empty){el.innerHTML='<div class="card-body" style="color:var(--gray-400);font-size:13px;">No clock entries today.</div>';return;}
@@ -1137,16 +1137,44 @@ function submitTablet(){
 }
 
 function markShippedBtn(btn){
-  // Find the full tablet data from cache
   var id=btn.getAttribute('data-tid');
   var name=btn.getAttribute('data-tname');
   if(!id){showToast('❌ Missing tablet ID');return;}
-  // Fetch full tablet data then open brand picker
+  btn.disabled=true;btn.textContent='Shipping…';
+  // Get full tablet data
   db.collection('tablets').doc(id).get().then(function(doc){
-    if(!doc.exists){showToast('❌ Tablet not found');return;}
+    if(!doc.exists){showToast('❌ Not found');btn.disabled=false;btn.textContent='Mark shipped';return;}
     var tb=doc.data();tb.id=doc.id;
-    openShipBrandPicker(tb);
-  }).catch(function(e){showToast('❌ '+e.message);});
+    // Mark shipped + create restaurant in pipeline simultaneously
+    return Promise.all([
+      db.collection('tablets').doc(id).update({
+        status:'shipped',
+        shippedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        shippedBy:CU.name
+      }),
+      db.collection('restaurants').add({
+        name:tb.restaurantName||name,
+        ownerName:tb.ownerName||'',
+        phone:tb.phone||'',
+        address:tb.address||'',
+        brands:tb.brandsSelected||tb.brands||[],
+        agent:'Saber',
+        status:'new',
+        stepIndex:0,
+        fromTablet:id,
+        platforms:['Uber Eats'],
+        submittedBy:tb.submittedBy||'',
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      })
+    ]);
+  }).then(function(){
+    addNotif('tablet','📦 Tablet shipped to '+name+' — added to pipeline for Saber');
+    showToast('✅ Shipped! '+name+' added to pipeline.');
+    renderTablet();
+  }).catch(function(e){
+    showToast('❌ '+e.message);
+    btn.disabled=false;btn.textContent='Mark shipped';
+  });
 }
 
 function openShipBrandPicker(tb){
@@ -1499,18 +1527,21 @@ function syncAllToPipeline(){
     db.collection('restaurants').get()
   ]).then(function(results){
     var tabSnap=results[0], restSnap=results[1];
-    // Build set of tablet IDs already in pipeline
-    var existing=new Set();
+    // Build set of tablet IDs AND names already in pipeline
+    var existingTabletIds=new Set();
+    var existingNames=new Set();
     restSnap.forEach(function(d){
-      var ft=d.data().fromTablet;
-      if(ft)existing.add(ft);
+      var r=d.data();
+      if(r.fromTablet)existingTabletIds.add(r.fromTablet);
+      if(r.name)existingNames.add(r.name.toLowerCase().trim());
     });
 
-    // Filter tablets not yet in pipeline
+    // Filter tablets not yet in pipeline (check by ID and name)
     var toAdd=[];
     tabSnap.forEach(function(d){
       var tb=d.data();tb.id=d.id;
-      if(!existing.has(tb.id))toAdd.push(tb);
+      var nameKey=(tb.restaurantName||'').toLowerCase().trim();
+      if(!existingTabletIds.has(tb.id)&&!existingNames.has(nameKey))toAdd.push(tb);
     });
 
     if(!toAdd.length){
