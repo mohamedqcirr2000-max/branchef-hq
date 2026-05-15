@@ -1090,7 +1090,7 @@ function renderTablet(){
       +'<td><strong>'+esc(t.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(t.address)+'</div></td>'
       +'<td>'+esc(t.submittedBy)+'</td>'
       +'<td><span class="pill pill-pending">Pending</span></td>'
-      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="markShipped(event,\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'<td></td>')
+      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="markShippedBtn(this)" data-tid="'+t.id+'" data-tname="'+esc(t.restaurantName)+'" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'<td></td>')
       +'</tr>';
   }).join('');
 
@@ -1136,9 +1136,12 @@ function submitTablet(){
   .finally(function(){btn.disabled=false;btn.textContent='📦 Send tablet request';});
 }
 
-function markShipped(ev,id,name){
-  var btn=ev&&ev.target?ev.target:null;
-  if(btn){btn.disabled=true;btn.textContent='Shipping…';}
+function markShippedBtn(btn){
+  var id=btn.getAttribute('data-tid');
+  var name=btn.getAttribute('data-tname');
+  if(!id){showToast('❌ Missing tablet ID');return;}
+  btn.disabled=true;
+  btn.textContent='Shipping…';
   db.collection('tablets').doc(id).update({
     status:'shipped',
     shippedAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -1148,10 +1151,14 @@ function markShipped(ev,id,name){
     showToast('📦 Shipped! '+name);
     renderTablet();
   }).catch(function(e){
-    showToast('❌ Error: '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='Mark shipped';}
+    alert('Firestore error: '+e.message);
+    showToast('❌ '+e.message);
+    btn.disabled=false;
+    btn.textContent='Mark shipped';
   });
 }
+
+function markShipped(ev,id,name){markShippedBtn({getAttribute:function(k){return k==='data-tid'?id:name;},disabled:false,textContent:''});}
 
 // ==========================================
 // NOTIFICATIONS
