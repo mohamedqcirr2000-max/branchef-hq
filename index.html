@@ -1372,14 +1372,49 @@ function clockOut(){
       var open=null;
       snap.forEach(function(d){var data=d.data();if(data.clockIn&&!data.clockOut)open=d;});
       if(open){
-        open.ref.update({clockOut:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){
-          addNotif('clock','⏹ '+CU.name+' clocked out');
-          sendEmail('Clock Out', CU.name, '⏹ '+CU.name+' clocked OUT at '+new Date().toLocaleTimeString('en-CA',{hour12:false}));
-          showToast('⏹ Clocked out!');
-          checkClockStatus();loadSessions();
-        });
+        window._clockOutRef=open;
+        openEndOfDayModal();
+      }else{
+        showToast(lang==='fr'?'⚠️ Aucune session ouverte trouvée':'⚠️ No open session found');
       }
     }).catch(function(e){showToast('❌ '+e.message);});
+}
+
+function openEndOfDayModal(){
+  document.getElementById('ma-title').textContent=lang==='fr'?'👋 Avant de partir…':'👋 Before you go…';
+  document.getElementById('ma-body').innerHTML=
+    '<p style="font-size:13px;color:var(--gray-600);margin-bottom:14px;">'
+    +(lang==='fr'?'Décris brièvement ce que tu as fait aujourd\'hui et comment s\'est passée ta journée. C\'est requis pour pointer la sortie.':'Briefly describe what you did today and how your day went. This is required to clock out.')
+    +'</p>'
+    +'<div class="field"><label>'+(lang==='fr'?'Qu\'as-tu fait aujourd\'hui ? *':'What did you do today? *')+'</label><textarea id="eod-tasks" placeholder="'+(lang==='fr'?'Ex: appels clients, suivi des restaurants...':'E.g. client calls, restaurant follow-ups...')+'" style="min-height:80px;"></textarea></div>'
+    +'<div class="field"><label>'+(lang==='fr'?'Comment était ta journée ? *':'How was your day? *')+'</label><textarea id="eod-feeling" placeholder="'+(lang==='fr'?'Ex: bonne journée, productive, quelques défis...':'E.g. good day, productive, some challenges...')+'" style="min-height:60px;"></textarea></div>'
+    +'<div id="eod-error" style="color:#cc0000;font-size:12px;margin-bottom:8px;display:none;">'+(lang==='fr'?'⚠️ Les deux champs sont obligatoires.':'⚠️ Both fields are required.')+'</div>'
+    +'<button class="btn btn-primary btn-full" id="eod-submit-btn" onclick="submitEndOfDay()">'+(lang==='fr'?'⏹ Pointer la sortie':'⏹ Clock Out')+'</button>';
+  openModal('modal-admin');
+}
+
+function submitEndOfDay(){
+  var tasks=document.getElementById('eod-tasks').value.trim();
+  var feeling=document.getElementById('eod-feeling').value.trim();
+  var errEl=document.getElementById('eod-error');
+  if(!tasks||!feeling){errEl.style.display='block';return;}
+  errEl.style.display='none';
+  var btn=document.getElementById('eod-submit-btn');
+  btn.disabled=true;btn.textContent=lang==='fr'?'Envoi…':'Submitting…';
+  var open=window._clockOutRef;
+  if(!open){showToast('❌ Session lost, try again');return;}
+  open.ref.update({
+    clockOut:firebase.firestore.FieldValue.serverTimestamp(),
+    endOfDayTasks:tasks,
+    endOfDayFeeling:feeling
+  }).then(function(){
+    addNotif('clock','⏹ '+CU.name+' clocked out — "'+tasks.substring(0,60)+(tasks.length>60?'…':'')+'"');
+    sendEmail('Clock Out', CU.name, '⏹ '+CU.name+' clocked OUT at '+new Date().toLocaleTimeString('en-CA',{hour12:false})+'\n\nWhat they did: '+tasks+'\n\nHow their day went: '+feeling);
+    showToast(lang==='fr'?'⏹ Sortie pointée !':'⏹ Clocked out!');
+    closeModal('modal-admin');
+    checkClockStatus();loadSessions();
+    window._clockOutRef=null;
+  }).catch(function(e){showToast('❌ '+e.message);btn.disabled=false;btn.textContent=lang==='fr'?'⏹ Pointer la sortie':'⏹ Clock Out';});
 }
 
 function loadSessions(){
@@ -1395,8 +1430,10 @@ function loadSessions(){
         var data=d.data();
         var inT=data.clockIn?data.clockIn.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'–';
         var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'Still working';
-        rows+='<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--gray-100);font-size:13px;">'
-          +'<span>Clock in: <strong>'+inT+'</strong></span><span>Out: <strong>'+outT+'</strong></span></div>';
+        rows+='<div style="padding:9px 0;border-bottom:1px solid var(--gray-100);font-size:13px;">'
+          +'<div style="display:flex;justify-content:space-between;"><span>Clock in: <strong>'+inT+'</strong></span><span>Out: <strong>'+outT+'</strong></span></div>'
+          +(data.endOfDayTasks?'<div style="margin-top:6px;font-size:12px;color:var(--gray-500);background:var(--gray-50);border-radius:8px;padding:8px 10px;"><strong>📝 '+(lang==='fr'?'Tâches':'Tasks')+':</strong> '+esc(data.endOfDayTasks)+'<br><strong>💭 '+(lang==='fr'?'Journée':'Day')+':</strong> '+esc(data.endOfDayFeeling||'')+'</div>':'')
+          +'</div>';
       });
       el.innerHTML='<div class="card-body">'+rows+'</div>';
     }).catch(function(){});
@@ -1414,11 +1451,16 @@ function loadSessions(){
         var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'🟢 Still in';
         var ms=data.clockOut&&data.clockIn?data.clockOut.toDate()-data.clockIn.toDate():0;
         var dur=ms?(Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m'):'–';
-        rows+='<tr><td><strong>'+esc(data.userName)+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td>'+dur+'</td></tr>';
+        var noteBtn=data.endOfDayTasks?'<button onclick=\'viewEodNote('+JSON.stringify(esc(data.userName))+','+JSON.stringify(esc(data.endOfDayTasks))+','+JSON.stringify(esc(data.endOfDayFeeling||""))+')\' style="font-size:11px;padding:3px 8px;background:var(--brand-light);color:var(--brand);border:none;border-radius:6px;cursor:pointer;">📝 Note</button>':'<span style="color:var(--gray-300);font-size:11px;">—</span>';
+        rows+='<tr><td><strong>'+esc(data.userName)+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td>'+dur+'</td><td>'+noteBtn+'</td></tr>';
       });
-      el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>'+(lang==='fr'?'Nom':'Name')+'</th><th>'+(lang==='fr'?'Entrée':'Clock In')+'</th><th>'+(lang==='fr'?'Sortie':'Clock Out')+'</th><th>'+(lang==='fr'?'Durée':'Duration')+'</th><th>'+(lang==='fr'?'Note du jour':'End-of-day note')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     }).catch(function(){});
   }
+}
+
+function viewEodNote(name,tasks,feeling){
+  alert((lang==='fr'?'📝 Note de fin de journée — ':'📝 End-of-day note — ')+name+'\n\n'+(lang==='fr'?'Tâches':'What they did')+':\n'+tasks+'\n\n'+(lang==='fr'?'Comment était leur journée':'How their day went')+':\n'+feeling);
 }
 
 // ==========================================
@@ -1664,12 +1706,14 @@ function adminMonthlyReport(){
   }).join('');
   var now=new Date();
   var monthVal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  document.getElementById('ma-title').textContent='📄 Monthly Attendance Report';
+  document.getElementById('ma-title').textContent=(lang==='fr'?'📄 Rapport de présence mensuel':'📄 Monthly Attendance Report');
   document.getElementById('ma-body').innerHTML=
-    '<p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">Generate a day-by-day PDF showing clock in/out, hours worked, and missed days for the selected employee and month.</p>'
-    +'<div class="field"><label>Employee</label><select id="mr-employee"><option value="__all__">All team members (one per page)</option>'+teamOpts+'</select></div>'
-    +'<div class="field"><label>Month</label><input type="month" id="mr-month" value="'+monthVal+'"></div>'
-    +'<button class="btn btn-primary btn-full" id="mr-gen-btn" onclick="generateMonthlyPDF()" style="margin-top:8px;">📄 Generate & Download PDF</button>'
+    '<p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">'+(lang==='fr'?'Générez un PDF jour par jour montrant l\'entrée/sortie, les heures travaillées et les jours manqués pour l\'employé et le mois sélectionnés.':'Generate a day-by-day PDF showing clock in/out, hours worked, and missed days for the selected employee and month.')+'</p>'
+    +'<div class="field"><label>'+(lang==='fr'?'Employé':'Employee')+'</label><select id="mr-employee"><option value="__all__">'+(lang==='fr'?'Toute l\'équipe (une page chacun)':'All team members (one per page)')+'</option>'+teamOpts+'</select></div>'
+    +'<div class="field"><label>'+(lang==='fr'?'Mois':'Month')+'</label><input type="month" id="mr-month" value="'+monthVal+'"></div>'
+    +'<div class="field"><label>'+(lang==='fr'?'Langue du PDF':'PDF language')+'</label><select id="mr-lang"><option value="'+lang+'" selected>'+(lang==='fr'?'Français (langue actuelle)':'English (current language)')+'</option><option value="'+(lang==='fr'?'en':'fr')+'">'+(lang==='fr'?'English':'Français')+'</option></select></div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--gray-600);margin:10px 0 4px;cursor:pointer;"><input type="checkbox" id="mr-notes" checked style="width:16px;height:16px;"> '+(lang==='fr'?'Inclure les notes de fin de journée':'Include end-of-day notes')+'</label>'
+    +'<button class="btn btn-primary btn-full" id="mr-gen-btn" onclick="generateMonthlyPDF()" style="margin-top:8px;">'+(lang==='fr'?'📄 Générer & télécharger le PDF':'📄 Generate & Download PDF')+'</button>'
     +'<div id="mr-status" style="margin-top:10px;font-size:12px;color:var(--gray-400);"></div>';
   openModal('modal-admin');
 }
@@ -1677,10 +1721,33 @@ function adminMonthlyReport(){
 function generateMonthlyPDF(){
   var employee=document.getElementById('mr-employee').value;
   var monthInput=document.getElementById('mr-month').value; // "YYYY-MM"
+  var pdfLang=document.getElementById('mr-lang').value;
+  var includeNotes=document.getElementById('mr-notes').checked;
   if(!monthInput){showToast('⚠️ Pick a month');return;}
   var btn=document.getElementById('mr-gen-btn');
   var statusEl=document.getElementById('mr-status');
-  btn.disabled=true;btn.textContent='Loading data…';
+  var L=pdfLang==='fr'?{
+    title:'BranChef — Rapport de présence',
+    days:['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'],
+    headers:['Jour','Entrée','Sortie','Durée','Statut'],
+    absent:'Absent',missing:'⚠ Manquant',complete:'✓ Complet',noClockOut:'⚠ Pas de sortie',
+    summary:function(w,a,m,h,mi){return 'Jours travaillés: '+w+'   |   Jours absents: '+a+'   |   Sorties manquées: '+m+'   |   Total heures: '+h+'h '+mi+'m';},
+    notesTitle:'Notes de fin de journée',
+    notesTasks:'Tâches',notesFeeling:'Journée',
+    loading:'Chargement…',generating:'📄 Générer & télécharger le PDF',
+    noNote:'—'
+  }:{
+    title:'BranChef — Attendance Report',
+    days:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    headers:['Day','Clock In','Clock Out','Duration','Status'],
+    absent:'Absent',missing:'⚠ Missing',complete:'✓ Complete',noClockOut:'⚠ No clock-out',
+    summary:function(w,a,m,h,mi){return 'Days worked: '+w+'   |   Days absent: '+a+'   |   Missed clock-outs: '+m+'   |   Total hours: '+h+'h '+mi+'m';},
+    notesTitle:'End-of-day notes',
+    notesTasks:'Tasks',notesFeeling:'Day',
+    loading:'Loading…',generating:'📄 Generate & Download PDF',
+    noNote:'—'
+  };
+  btn.disabled=true;btn.textContent=L.loading;
   statusEl.textContent='';
 
   var year=parseInt(monthInput.split('-')[0]);
@@ -1689,7 +1756,6 @@ function generateMonthlyPDF(){
   var daysInMonth=new Date(year,monthNum,0).getDate();
   var lastDay=monthInput+'-'+String(daysInMonth).padStart(2,'0');
 
-  // Fetch all clock entries in range [firstDay, lastDay]
   db.collection('clock').where('date','>=',firstDay).where('date','<=',lastDay).get().then(function(snap){
     var allEntries=[];
     snap.forEach(function(d){allEntries.push(d.data());});
@@ -1700,70 +1766,72 @@ function generateMonthlyPDF(){
 
     var jsPDFCtor=window.jspdf.jsPDF;
     var doc=new jsPDFCtor({unit:'pt',format:'a4'});
-    var monthName=new Date(year,monthNum-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
-    var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var monthName=new Date(year,monthNum-1,1).toLocaleDateString(pdfLang==='fr'?'fr-CA':'en-US',{month:'long',year:'numeric'});
 
     employeesToReport.forEach(function(empName,idx){
       if(idx>0)doc.addPage();
 
-      // Header
       doc.setFontSize(18);doc.setTextColor(124,58,237);
-      doc.text('BranChef — Attendance Report',40,46);
+      doc.text(L.title,40,46);
       doc.setFontSize(12);doc.setTextColor(40,40,40);
       doc.text(empName,40,68);
       doc.setFontSize(10);doc.setTextColor(120,120,120);
       doc.text(monthName,40,84);
 
-      // Build day-by-day rows for entire month
       var empEntries=allEntries.filter(function(e){return e.userName===empName;});
       var totalMsAll=0,daysWorked=0,daysMissedClockOut=0,daysAbsent=0;
       var body=[];
+      var dailyNotes=[]; // {day, tasks, feeling}
 
       for(var day=1;day<=daysInMonth;day++){
         var dateStr=monthInput+'-'+String(day).padStart(2,'0');
         var dObj=new Date(year,monthNum-1,day);
-        var dayName=dayNames[dObj.getDay()];
+        var dayName=L.days[dObj.getDay()];
         var dayEntries=empEntries.filter(function(e){return e.date===dateStr;});
 
         if(!dayEntries.length){
-          body.push([dayName+' '+day,'—','—','—','Absent']);
+          body.push([dayName+' '+day,'—','—','—',L.absent]);
           daysAbsent++;
           continue;
         }
 
         daysWorked++;
-        var dayMs=0,inTimes=[],outTimes=[],missedOut=false;
+        var dayMs=0,inTimes=[],outTimes=[],missedOut=false,dayTasks=[],dayFeelings=[];
         dayEntries.forEach(function(e){
           if(e.clockIn)inTimes.push(e.clockIn.toDate());
-          if(e.clockOut){
-            outTimes.push(e.clockOut.toDate());
-          }else if(e.clockIn){
-            missedOut=true;
-          }
-          if(e.clockIn&&e.clockOut){
-            dayMs+=(e.clockOut.toDate()-e.clockIn.toDate());
-          }
+          if(e.clockOut){outTimes.push(e.clockOut.toDate());}
+          else if(e.clockIn){missedOut=true;}
+          if(e.clockIn&&e.clockOut){dayMs+=(e.clockOut.toDate()-e.clockIn.toDate());}
+          if(e.endOfDayTasks)dayTasks.push(e.endOfDayTasks);
+          if(e.endOfDayFeeling)dayFeelings.push(e.endOfDayFeeling);
         });
         totalMsAll+=dayMs;
         if(missedOut)daysMissedClockOut++;
 
         var inStr=inTimes.length?inTimes.map(function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});}).join(', '):'—';
-        var outStr=outTimes.length?outTimes.map(function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});}).join(', '):(missedOut?'⚠ Missing':'—');
+        var outStr=outTimes.length?outTimes.map(function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});}).join(', '):(missedOut?L.missing:'—');
         var h=Math.floor(dayMs/3600000),m=Math.floor((dayMs%3600000)/60000);
         var durStr=dayMs>0?(h+'h '+m+'m'):'—';
-        var status=missedOut?'⚠ No clock-out':'✓ Complete';
+        var status=missedOut?L.noClockOut:L.complete;
 
         body.push([dayName+' '+day,inStr,outStr,durStr,status]);
+
+        if(includeNotes&&(dayTasks.length||dayFeelings.length)){
+          dailyNotes.push({
+            label:dayName+' '+day,
+            tasks:dayTasks.join(' / ')||L.noNote,
+            feeling:dayFeelings.join(' / ')||L.noNote
+          });
+        }
       }
 
-      // Summary box
       var totalH=Math.floor(totalMsAll/3600000),totalM=Math.floor((totalMsAll%3600000)/60000);
       doc.setFontSize(9);doc.setTextColor(90,90,90);
-      doc.text('Days worked: '+daysWorked+'   |   Days absent: '+daysAbsent+'   |   Missed clock-outs: '+daysMissedClockOut+'   |   Total hours: '+totalH+'h '+totalM+'m',40,100);
+      doc.text(L.summary(daysWorked,daysAbsent,daysMissedClockOut,totalH,totalM),40,100);
 
       doc.autoTable({
         startY:114,
-        head:[['Day','Clock In','Clock Out','Duration','Status']],
+        head:[L.headers],
         body:body,
         styles:{fontSize:8,cellPadding:4},
         headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'},
@@ -1772,22 +1840,39 @@ function generateMonthlyPDF(){
         didParseCell:function(data){
           if(data.section==='body'){
             var rowText=data.row.raw[4];
-            if(rowText==='Absent'){data.cell.styles.textColor=[180,30,30];}
+            if(rowText===L.absent){data.cell.styles.textColor=[180,30,30];}
             else if(typeof rowText==='string'&&rowText.indexOf('⚠')>=0){data.cell.styles.textColor=[200,120,0];}
             else if(typeof rowText==='string'&&rowText.indexOf('✓')>=0){data.cell.styles.textColor=[20,140,80];}
           }
         }
       });
+
+      // Append daily notes section if requested and present
+      if(includeNotes&&dailyNotes.length){
+        var afterTableY=doc.lastAutoTable.finalY+20;
+        if(afterTableY>700){doc.addPage();afterTableY=46;}
+        doc.setFontSize(12);doc.setTextColor(124,58,237);
+        doc.text('📝 '+L.notesTitle,40,afterTableY);
+        var notesBody=dailyNotes.map(function(n){return [n.label,n.tasks,n.feeling];});
+        doc.autoTable({
+          startY:afterTableY+10,
+          head:[[pdfLang==='fr'?'Jour':'Day',L.notesTasks,L.notesFeeling]],
+          body:notesBody,
+          styles:{fontSize:7.5,cellPadding:4},
+          headStyles:{fillColor:[40,40,60],textColor:255,fontStyle:'bold'},
+          columnStyles:{0:{cellWidth:60},1:{cellWidth:220},2:{cellWidth:180}}
+        });
+      }
     });
 
     var fname='BranChef_Attendance_'+(employee==='__all__'?'AllStaff':employee)+'_'+monthInput+'.pdf';
     doc.save(fname);
-    showToast('✅ PDF downloaded!');
-    btn.disabled=false;btn.textContent='📄 Generate & Download PDF';
-    statusEl.textContent='Downloaded: '+fname;
+    showToast('✅ '+(pdfLang==='fr'?'PDF téléchargé !':'PDF downloaded!'));
+    btn.disabled=false;btn.textContent=L.generating;
+    statusEl.textContent=(pdfLang==='fr'?'Téléchargé: ':'Downloaded: ')+fname;
   }).catch(function(e){
     showToast('❌ '+e.message);
-    btn.disabled=false;btn.textContent='📄 Generate & Download PDF';
+    btn.disabled=false;btn.textContent=pdfLang==='fr'?'📄 Générer & télécharger le PDF':'📄 Generate & Download PDF';
   });
 }
 
