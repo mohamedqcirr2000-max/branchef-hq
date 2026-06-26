@@ -11,6 +11,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -1463,6 +1465,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminBrands()"><div class="admin-card-ico">🍔</div><div class="admin-card-title">Manage Brands</div><div class="admin-card-desc">Add, rename or remove virtual brands</div></div>'
     +'<div class="admin-card" onclick="adminTeam()"><div class="admin-card-ico">👥</div><div class="admin-card-title">Team Overview</div><div class="admin-card-desc">See all team members, roles & emails</div></div>'
     +'<div class="admin-card" onclick="adminClock()"><div class="admin-card-ico">⏱</div><div class="admin-card-title">Clock Reports</div><div class="admin-card-desc">Full team attendance by date</div></div>'
+    +'<div class="admin-card" onclick="adminMonthlyReport()"><div class="admin-card-ico">📄</div><div class="admin-card-title">Monthly Report (PDF)</div><div class="admin-card-desc">Download attendance PDF per employee</div></div>'
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
     +'<div class="admin-card" onclick="adminTablets()"><div class="admin-card-ico">📦</div><div class="admin-card-title">All Tablet Requests</div><div class="admin-card-desc">Full history — pending, shipped, all 20+</div></div>'
@@ -1651,6 +1654,141 @@ function loadClockReport(){
     var th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);
     el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th></tr></thead><tbody>'+rows+'</tbody></table></div>'      +(totalMs>0?'<div style="text-align:right;font-size:12px;font-weight:700;color:var(--brand);padding:8px 4px;">Team total: '+th+'h '+tm+'m</div>':'');
   }).catch(function(e){if(el)el.innerHTML='<p style="color:red;font-size:12px;">Error: '+e.message+'</p>';});
+}
+
+
+function adminMonthlyReport(){
+  var teamOpts=Object.keys(TEAM).map(function(email){
+    var t=TEAM[email];
+    return '<option value="'+esc(t.name)+'">'+esc(t.name)+' ('+roleLabel(t.role)+')</option>';
+  }).join('');
+  var now=new Date();
+  var monthVal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('ma-title').textContent='📄 Monthly Attendance Report';
+  document.getElementById('ma-body').innerHTML=
+    '<p style="font-size:13px;color:var(--gray-500);margin-bottom:16px;">Generate a day-by-day PDF showing clock in/out, hours worked, and missed days for the selected employee and month.</p>'
+    +'<div class="field"><label>Employee</label><select id="mr-employee"><option value="__all__">All team members (one per page)</option>'+teamOpts+'</select></div>'
+    +'<div class="field"><label>Month</label><input type="month" id="mr-month" value="'+monthVal+'"></div>'
+    +'<button class="btn btn-primary btn-full" id="mr-gen-btn" onclick="generateMonthlyPDF()" style="margin-top:8px;">📄 Generate & Download PDF</button>'
+    +'<div id="mr-status" style="margin-top:10px;font-size:12px;color:var(--gray-400);"></div>';
+  openModal('modal-admin');
+}
+
+function generateMonthlyPDF(){
+  var employee=document.getElementById('mr-employee').value;
+  var monthInput=document.getElementById('mr-month').value; // "YYYY-MM"
+  if(!monthInput){showToast('⚠️ Pick a month');return;}
+  var btn=document.getElementById('mr-gen-btn');
+  var statusEl=document.getElementById('mr-status');
+  btn.disabled=true;btn.textContent='Loading data…';
+  statusEl.textContent='';
+
+  var year=parseInt(monthInput.split('-')[0]);
+  var monthNum=parseInt(monthInput.split('-')[1]); // 1-12
+  var firstDay=monthInput+'-01';
+  var daysInMonth=new Date(year,monthNum,0).getDate();
+  var lastDay=monthInput+'-'+String(daysInMonth).padStart(2,'0');
+
+  // Fetch all clock entries in range [firstDay, lastDay]
+  db.collection('clock').where('date','>=',firstDay).where('date','<=',lastDay).get().then(function(snap){
+    var allEntries=[];
+    snap.forEach(function(d){allEntries.push(d.data());});
+
+    var employeesToReport=employee==='__all__'
+      ? Object.values(TEAM).map(function(t){return t.name;})
+      : [employee];
+
+    var jsPDFCtor=window.jspdf.jsPDF;
+    var doc=new jsPDFCtor({unit:'pt',format:'a4'});
+    var monthName=new Date(year,monthNum-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    employeesToReport.forEach(function(empName,idx){
+      if(idx>0)doc.addPage();
+
+      // Header
+      doc.setFontSize(18);doc.setTextColor(124,58,237);
+      doc.text('BranChef — Attendance Report',40,46);
+      doc.setFontSize(12);doc.setTextColor(40,40,40);
+      doc.text(empName,40,68);
+      doc.setFontSize(10);doc.setTextColor(120,120,120);
+      doc.text(monthName,40,84);
+
+      // Build day-by-day rows for entire month
+      var empEntries=allEntries.filter(function(e){return e.userName===empName;});
+      var totalMsAll=0,daysWorked=0,daysMissedClockOut=0,daysAbsent=0;
+      var body=[];
+
+      for(var day=1;day<=daysInMonth;day++){
+        var dateStr=monthInput+'-'+String(day).padStart(2,'0');
+        var dObj=new Date(year,monthNum-1,day);
+        var dayName=dayNames[dObj.getDay()];
+        var dayEntries=empEntries.filter(function(e){return e.date===dateStr;});
+
+        if(!dayEntries.length){
+          body.push([dayName+' '+day,'—','—','—','Absent']);
+          daysAbsent++;
+          continue;
+        }
+
+        daysWorked++;
+        var dayMs=0,inTimes=[],outTimes=[],missedOut=false;
+        dayEntries.forEach(function(e){
+          if(e.clockIn)inTimes.push(e.clockIn.toDate());
+          if(e.clockOut){
+            outTimes.push(e.clockOut.toDate());
+          }else if(e.clockIn){
+            missedOut=true;
+          }
+          if(e.clockIn&&e.clockOut){
+            dayMs+=(e.clockOut.toDate()-e.clockIn.toDate());
+          }
+        });
+        totalMsAll+=dayMs;
+        if(missedOut)daysMissedClockOut++;
+
+        var inStr=inTimes.length?inTimes.map(function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});}).join(', '):'—';
+        var outStr=outTimes.length?outTimes.map(function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});}).join(', '):(missedOut?'⚠ Missing':'—');
+        var h=Math.floor(dayMs/3600000),m=Math.floor((dayMs%3600000)/60000);
+        var durStr=dayMs>0?(h+'h '+m+'m'):'—';
+        var status=missedOut?'⚠ No clock-out':'✓ Complete';
+
+        body.push([dayName+' '+day,inStr,outStr,durStr,status]);
+      }
+
+      // Summary box
+      var totalH=Math.floor(totalMsAll/3600000),totalM=Math.floor((totalMsAll%3600000)/60000);
+      doc.setFontSize(9);doc.setTextColor(90,90,90);
+      doc.text('Days worked: '+daysWorked+'   |   Days absent: '+daysAbsent+'   |   Missed clock-outs: '+daysMissedClockOut+'   |   Total hours: '+totalH+'h '+totalM+'m',40,100);
+
+      doc.autoTable({
+        startY:114,
+        head:[['Day','Clock In','Clock Out','Duration','Status']],
+        body:body,
+        styles:{fontSize:8,cellPadding:4},
+        headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'},
+        alternateRowStyles:{fillColor:[248,247,255]},
+        columnStyles:{0:{cellWidth:70},4:{cellWidth:90}},
+        didParseCell:function(data){
+          if(data.section==='body'){
+            var rowText=data.row.raw[4];
+            if(rowText==='Absent'){data.cell.styles.textColor=[180,30,30];}
+            else if(typeof rowText==='string'&&rowText.indexOf('⚠')>=0){data.cell.styles.textColor=[200,120,0];}
+            else if(typeof rowText==='string'&&rowText.indexOf('✓')>=0){data.cell.styles.textColor=[20,140,80];}
+          }
+        }
+      });
+    });
+
+    var fname='BranChef_Attendance_'+(employee==='__all__'?'AllStaff':employee)+'_'+monthInput+'.pdf';
+    doc.save(fname);
+    showToast('✅ PDF downloaded!');
+    btn.disabled=false;btn.textContent='📄 Generate & Download PDF';
+    statusEl.textContent='Downloaded: '+fname;
+  }).catch(function(e){
+    showToast('❌ '+e.message);
+    btn.disabled=false;btn.textContent='📄 Generate & Download PDF';
+  });
 }
 
 function adminEmailJS(){
