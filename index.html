@@ -272,8 +272,8 @@ tbody tr:hover td{background:var(--gray-50);}
       <p>Operations platform</p>
       <!-- Language switcher -->
       <div style="display:flex;gap:6px;justify-content:center;margin-top:10px;">
-        <button id="btn-lang-en" onclick="setLang('en')" style="padding:4px 14px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">🇬🇧 EN</button>
-        <button id="btn-lang-fr" onclick="setLang('fr')" style="padding:4px 14px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--white);color:var(--gray-800);">🇫🇷 FR</button>
+        <button id="btn-lang-en" onclick="setLang('en')" style="padding:4px 14px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">EN</button>
+        <button id="btn-lang-fr" onclick="setLang('fr')" style="padding:4px 14px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--white);color:var(--gray-800);">FR</button>
       </div>
     </div>
     <div class="err" id="login-err"></div>
@@ -326,8 +326,10 @@ tbody tr:hover td{background:var(--gray-50);}
       </div>
       <div class="topbar-right">
         <div class="live-clock" id="live-clock">--:--:--</div>
-        <button onclick="setLang(lang==='en'?'fr':'en')" style="background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" id="topbar-lang">🇬🇧 EN</button>
-        <button onclick="toggleAIChat()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🤖 AI</button>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button id="topbar-lang-en" onclick="setLang('en')" style="padding:4px 12px;border-radius:20px;border:1.5px solid var(--brand);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--brand);color:#fff;">EN</button>
+          <button id="topbar-lang-fr" onclick="setLang('fr')" style="padding:4px 12px;border-radius:20px;border:1.5px solid var(--gray-200);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--gray-100);color:var(--gray-800);">FR</button>
+        </div>
         <button onclick="doLogout()" style="background:none;border:1px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);font-family:inherit;">↩ Logout</button>
       </div>
     </div>
