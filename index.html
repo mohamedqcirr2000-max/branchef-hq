@@ -844,12 +844,55 @@ function renderDashboard(){
     +'<div class="sec-lbl">'+t('team_online')+'</div>'
     +'<div class="card"><div class="card-body"><div id="online-grid" class="online-wrap"><div class="spin" style="width:20px;height:20px;border-width:2px;"></div></div></div></div>'
     +(CU.role==='owner'?'<div class="sec-lbl">'+t('clock_log')+'</div><div class="card" id="clock-log-dash"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>':'')
+    +(CU.role==='sales'?'<div class="sec-lbl" style="margin-top:16px;">My Restaurants</div><div class="card" id="my-restos-dash"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>':'')
     +'</div>'
     +'</div>';
 
   renderDashActivity();
   renderOnlineGrid();
   if(CU.role==='owner')renderClockLogDash();
+  if(CU.role==='sales')renderMyRestaurants();
+}
+
+function renderMyRestaurants(){
+  // Show sales person their own restaurants (tablets they submitted + restaurants created from those)
+  var myTablets=tablets.filter(function(tb){return tb.submittedBy===CU.name;});
+  var myRests=restaurants.filter(function(r){return r.submittedBy===CU.name;});
+
+  var el=document.getElementById('my-restos-dash');
+  if(!el)return;
+
+  if(!myTablets.length&&!myRests.length){
+    el.innerHTML='<div class="empty" style="padding:1rem;"><p>No restaurants yet</p></div>';
+    return;
+  }
+
+  // Build combined list: restaurants first, then tablets not yet in pipeline
+  var restNames=new Set(myRests.map(function(r){return (r.name||'').toLowerCase().trim();}));
+  var pendingTabs=myTablets.filter(function(tb){return !restNames.has((tb.restaurantName||'').toLowerCase().trim());});
+
+  var rows='';
+  myRests.forEach(function(r){
+    var s=r.stepIndex||0;
+    var pill=r.status==='live'?'pill-live':(STEP_PILLS[s]||'pill-new');
+    var lbl=r.status==='live'?'✓ Live':(STEP_LABELS[s]||'New');
+    rows+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100);">'
+      +'<div><div style="font-size:13px;font-weight:700;">'+esc(r.name)+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-400);">'+esc(r.ownerName||'')+(r.phone?' · '+esc(r.phone):'')+'</div></div>'
+      +'<span class="pill '+pill+'">'+lbl+'</span>'
+      +'</div>';
+  });
+  pendingTabs.forEach(function(tb){
+    var stlbl=tb.status==='shipped'?'📦 Shipped':'⏳ Pending';
+    var stcol=tb.status==='shipped'?'var(--brand)':'var(--amber)';
+    rows+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100);">'
+      +'<div><div style="font-size:13px;font-weight:700;">'+esc(tb.restaurantName)+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-400);">'+esc(tb.ownerName||'')+(tb.phone?' · '+esc(tb.phone):'')+'</div></div>'
+      +'<span style="font-size:11px;font-weight:700;color:'+stcol+';">'+stlbl+'</span>'
+      +'</div>';
+  });
+
+  el.innerHTML='<div class="card-body">'+rows+'</div>';
 }
 
 function renderDashActivity(){
@@ -859,8 +902,8 @@ function renderDashActivity(){
   // Filter notifications by role
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return n.type==='tablet'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
   if(!filtered.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
@@ -881,11 +924,12 @@ function renderOnlineGrid(){
       var d=doc.data();
       var ts=d.lastSeen?d.lastSeen.toDate().getTime():0;
       var online=(now-ts)<90000;
-      html+='<div class="online-card">'
-        +'<div class="online-dot '+(online?'on':'off')+'"></div>'
-        +'<div class="avatar '+(d.av||'av-purple')+'" style="width:24px;height:24px;font-size:10px;">'+esc(d.initials||'?')+'</div>'
-        +'<span style="font-size:13px;font-weight:600;">'+esc(d.name)+'</span>'
-        +'</div>';
+      var isOwnerView=(CU&&CU.role==='owner');
+      html+='<div class="online-card">';
+      if(isOwnerView)html+='<div class="online-dot '+(online?'on':'off')+'" style="flex-shrink:0;"></div>';
+      html+='<div class="avatar '+(d.av||'av-purple')+'" style="width:28px;height:28px;font-size:13px;font-weight:700;">'+esc((d.name||'?')[0].toUpperCase())+'</div>';
+      if(isOwnerView)html+='<div><div style="font-size:13px;font-weight:600;">'+esc(d.name)+'</div><div style="font-size:10px;color:'+(online?'var(--green)':'var(--gray-400)')+';">'+(online?'Online':'Offline')+'</div></div>';
+      html+='</div>';
     });
     if(el)el.innerHTML=html||'<p style="color:var(--gray-400);font-size:13px;">No one online yet</p>';
   });
@@ -1402,8 +1446,8 @@ var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'�
 function renderNotifications(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
-    if(CU.role==='onboarding')return n.type==='step'||n.type==='live'||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return n.type==='tablet'||n.type==='new'||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     return false;
   });
   var html=filtered.length?filtered.map(function(n){
