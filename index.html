@@ -1535,26 +1535,32 @@ function submitLead(){
     submittedBy:CU.name, status:'pending',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    // Email the restaurant owner
+    // Notify Nadir by email to send DocuSign contract
     emailjs.init(EMAILJS_KEY);
     emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
-      title:'BranChef Partnership Contract - '+rname,
-      name: owner,
-      message:'Hello '+owner+',\n\nYou were contacted by '+CU.name+' from BranChef regarding a partnership for your restaurant "'+rname+'".\n\nPlease sign the BranChef partnership contract and return it to us. Once received, our team will activate your restaurant on delivery platforms (Uber Eats, DoorDash, Skip The Dishes).\n\nFor any questions: salesteam@getbranchef.com | (438) 453-0588\n\n-- BranChef Team',
-      email: email,
+      title:'New Lead — Please send DocuSign contract',
+      name: 'Nadir',
+      message: 'Hi Nadir,\n\n'+CU.name+' just added a new restaurant lead:\n\n'
+        +'Restaurant: '+rname+'\n'
+        +'Owner: '+owner+'\n'
+        +'Email: '+email+'\n'
+        +'Phone: '+(phone||'—')+'\n'
+        +'Address: '+(addr||'—')+'\n'
+        +(notes?'Notes: '+notes+'\n':'')
+        +'\nPlease send the BranChef partnership contract via DocuSign to: '+email+'\n\n— BranChef App',
+      email: 'branchemr@gmail.com',
       time: new Date().toLocaleTimeString('en-CA',{hour12:false})
-    }).catch(function(e){ console.log('email err',e); });
-
-    addNotif('new','📋 '+CU.name+' submitted lead: '+rname+' - contract sent to '+email);
-    showToast('Contract sent to '+email);
-    btn.disabled=false; btn.textContent='📋 Submit & send contract';
+    }).catch(function(e){console.log('email err',e);});
+    addNotif('new','📋 '+CU.name+' added lead: '+rname+' ('+owner+') — Nadir notified to send DocuSign to '+email);
+    showToast('✅ Lead saved! Nadir will be notified to send DocuSign contract.');
+    btn.disabled=false; btn.textContent='📋 Submit lead';
     ['ld-rname','ld-owner','ld-phone','ld-email','ld-addr','ld-notes'].forEach(function(id){
       var el=document.getElementById(id); if(el)el.value='';
     });
     renderLeads();
   }).catch(function(e){
     showToast('Error: '+e.message);
-    btn.disabled=false; btn.textContent='📋 Submit & send contract';
+    btn.disabled=false; btn.textContent='📋 Submit lead';
   });
 }
 
