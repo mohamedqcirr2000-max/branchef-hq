@@ -553,7 +553,6 @@ var TEAM = {
   "nadirkassimi@getbranchef.com":{name:"Nadir",   role:"owner",      initials:"ND",av:"av-purple"},
   "saber@getbranchef.com":       {name:"Saber",   role:"onboarding", initials:"SB",av:"av-amber"},
   "zayd@getbranchef.com":        {name:"Zayd",    role:"onboarding", initials:"ZY",av:"av-amber"},
-  "nadege@getbranchef.com":      {name:"Nada",    role:"sales",      initials:"NA",av:"av-blue"},
   "sarah@getbranchef.com":       {name:"Chaimae", role:"sales",      initials:"CH",av:"av-blue"},
   "sophia@getbranchef.com":      {name:"Ines",    role:"sales",      initials:"IN",av:"av-coral"}
 };
@@ -908,7 +907,7 @@ function renderDashActivity(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
     if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name)||(n.type==='new'&&n.message&&n.message.indexOf(CU.name)>=0);
     return false;
   });
   if(!filtered.length){el.innerHTML='<div class="empty" style="padding:1.5rem;"><p>No activity yet</p></div>';return;}
@@ -1508,7 +1507,7 @@ function renderLeadsSales(){
     +'<div class="field"><label>Owner email *</label><input id="ld-email" type="email" placeholder="owner@restaurant.com"></div>'
     +'<div class="field"><label>Address</label><input id="ld-addr" type="text" placeholder="Full address"></div>'
     +'<div class="field"><label>Notes</label><textarea id="ld-notes" placeholder="Useful info..."></textarea></div>'
-    +'<button class="btn btn-primary btn-full" id="btn-lead" onclick="submitLead()" style="margin-top:8px;">📋 Submit & send contract</button>'
+    +'<button class="btn btn-primary btn-full" id="btn-lead" onclick="submitLead()" style="margin-top:8px;">📋 Submit lead</button>'
     +'</div></div>'
     +'<div>'
     +'<div class="sec-lbl">My leads ('+myLeads.length+')</div>'
@@ -1538,18 +1537,20 @@ function submitLead(){
     // Notify Nadir by email to send DocuSign contract
     emailjs.init(EMAILJS_KEY);
     emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
-      title:'New Lead — Please send DocuSign contract',
+      title:'[BranChef] Nouveau lead — Envoyer contrat DocuSign',
       name: 'Nadir',
-      message: 'Hi Nadir,\n\n'+CU.name+' just added a new restaurant lead:\n\n'
-        +'Restaurant: '+rname+'\n'
-        +'Owner: '+owner+'\n'
-        +'Email: '+email+'\n'
-        +'Phone: '+(phone||'—')+'\n'
-        +'Address: '+(addr||'—')+'\n'
-        +(notes?'Notes: '+notes+'\n':'')
-        +'\nPlease send the BranChef partnership contract via DocuSign to: '+email+'\n\n— BranChef App',
+      message: 'Bonjour Nadir,'
+        +'\n\n'+CU.name+' vient d\'ajouter un nouveau lead :'
+        +'\n\n— Restaurant : '+rname
+        +'\n— Proprietaire : '+owner
+        +'\n— Email : '+email
+        +'\n— Telephone : '+(phone||'—')
+        +'\n— Adresse : '+(addr||'—')
+        +(notes?'\n— Notes : '+notes:'')
+        +'\n\nVeuillez envoyer le contrat BranChef via DocuSign a : '+email
+        +'\n\n— BranChef App',
       email: 'branchemr@gmail.com',
-      time: new Date().toLocaleTimeString('en-CA',{hour12:false})
+      time: new Date().toLocaleTimeString('fr-CA',{hour12:false})
     }).catch(function(e){console.log('email err',e);});
     addNotif('new','📋 '+CU.name+' added lead: '+rname+' ('+owner+') — Nadir notified to send DocuSign to '+email);
     showToast('✅ Lead saved! Nadir will be notified to send DocuSign contract.');
@@ -1611,7 +1612,7 @@ function renderNotifications(){
   var filtered=notifs.filter(function(n){
     if(CU.role==='owner')return true;
     if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
-    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
+    if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name)||(n.type==='new'&&n.message&&n.message.indexOf(CU.name)>=0);
     return false;
   });
   var html=filtered.length?filtered.map(function(n){
