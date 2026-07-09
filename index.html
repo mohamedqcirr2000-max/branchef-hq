@@ -12,6 +12,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -921,11 +923,15 @@ function renderOnlineGrid(){
   var el=document.getElementById('online-grid');
   if(!el)return;
   // Check presence collection — online if lastSeen within 90 seconds
+  // Build set of valid team emails
+  var validNames=new Set(Object.values(TEAM).map(function(t){return t.name;}));
   db.collection('presence').onSnapshot(function(snap){
     var now=Date.now();
     var html='';
     snap.forEach(function(doc){
       var d=doc.data();
+      // Only show people still in the TEAM object
+      if(!validNames.has(d.name))return;
       var ts=d.lastSeen?d.lastSeen.toDate().getTime():0;
       var online=(now-ts)<90000;
       var isOwnerView=(CU&&CU.role==='owner');
@@ -1805,6 +1811,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminClock()"><div class="admin-card-ico">⏱</div><div class="admin-card-title">Clock Reports</div><div class="admin-card-desc">Full team attendance by date</div></div>'
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
+    +'<div class="admin-card" onclick="adminMonthlyReport()"><div class="admin-card-ico">📄</div><div class="admin-card-title">Monthly Report (PDF)</div><div class="admin-card-desc">Download attendance PDF per employee</div></div>'
     +'</div>';
 }
 
@@ -1852,22 +1859,180 @@ function adminClock(){
 
 function loadClockReport(){
   var date=document.getElementById('clock-date-picker').value;
+  var el=document.getElementById('clock-report-body');
+  if(el)el.innerHTML='<div class="spin" style="margin:0 auto;"></div>';
   db.collection('clock').where('date','==',date).get().then(function(snap){
-    var el=document.getElementById('clock-report-body');
     if(!el)return;
-    if(snap.empty){el.innerHTML='<p style="color:var(--gray-400);font-size:13px;">No entries for this date.</p>';return;}
-    var rows='';
-    snap.forEach(function(d){
-      var data=d.data();
-      var inT=data.clockIn?data.clockIn.toDate().toLocaleTimeString('en-CA',{hour12:false}):'–';
-      var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false}):'Not clocked out';
+    if(snap.empty){el.innerHTML='<p style="color:var(--gray-400);font-size:13px;padding:12px 0;">No entries for this date.</p>';return;}
+    var entries=[];
+    snap.forEach(function(d){entries.push(d.data());});
+    entries.sort(function(a,b){return (a.clockIn?a.clockIn.toDate().getTime():0)-(b.clockIn?b.clockIn.toDate().getTime():0);});
+    var totalMs=0;
+    var rows=entries.map(function(data){
+      var inT=data.clockIn?data.clockIn.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'–';
+      var outT=data.clockOut?data.clockOut.toDate().toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'}):'🟢 Still in';
       var ms=data.clockOut&&data.clockIn?data.clockOut.toDate()-data.clockIn.toDate():0;
-      var dur=ms?(Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m'):'–';
-      rows+='<tr><td><strong>'+esc(data.userName)+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td><strong>'+dur+'</strong></td></tr>';
+      totalMs+=ms;
+      var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
+      var dur=ms>=3600000?h+'h '+m+'m':ms>=60000?m+'m '+s+'s':ms>0?s+'s':'–';
+      var noteBtn=data.endOfDayTasks?'<button onclick="viewEodNote(\''+esc(data.userName)+'\',\''+esc(data.endOfDayTasks)+'\',\''+esc(data.endOfDayFeeling||'')+'\')" style="font-size:11px;padding:3px 8px;background:var(--brand-light);color:var(--brand);border:none;border-radius:6px;cursor:pointer;">📝</button>':'';
+      return '<tr><td><strong>'+esc(data.userName||'—')+'</strong></td><td>'+inT+'</td><td>'+outT+'</td><td><strong>'+dur+'</strong></td><td>'+noteBtn+'</td></tr>';
+    }).join('');
+    var th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);
+    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +(totalMs>0?'<div style="text-align:right;font-size:12px;font-weight:700;color:var(--brand);padding:8px 4px;">Team total: '+th+'h '+tm+'m</div>':'');
+  }).catch(function(e){if(el)el.innerHTML='<p style="color:red;font-size:12px;">'+e.message+'</p>';});
+}
+
+
+function adminMonthlyReport(){
+  var teamOpts=Object.keys(TEAM).map(function(email){
+    var t=TEAM[email];
+    return '<option value="'+t.name+'">'+t.name+'</option>';
+  }).join('');
+  var now=new Date();
+  var monthVal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('ma-title').textContent='📄 Monthly Attendance Report';
+  document.getElementById('ma-body').innerHTML=
+    '<div class="field"><label>Employee</label><select id="mr-emp"><option value="__all__">All team members</option>'+teamOpts+'</select></div>'
+    +'<div class="field"><label>Month</label><input type="month" id="mr-month" value="'+monthVal+'"></div>'
+    +'<div class="field"><label>PDF Language</label><select id="mr-lang"><option value="en">English</option><option value="fr">Français</option></select></div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--gray-600);margin:10px 0 4px;cursor:pointer;"><input type="checkbox" id="mr-notes" checked style="width:16px;height:16px;"> Include end-of-day notes</label>'
+    +'<button class="btn btn-primary btn-full" id="mr-btn" onclick="generateMonthlyPDF()" style="margin-top:12px;">📄 Download PDF</button>'
+    +'<div id="mr-status" style="margin-top:8px;font-size:12px;color:var(--gray-400);"></div>';
+  openModal('modal-admin');
+}
+
+function generateMonthlyPDF(){
+  var emp=document.getElementById('mr-emp').value;
+  var monthInput=document.getElementById('mr-month').value;
+  var pdfLang=document.getElementById('mr-lang').value;
+  var includeNotes=document.getElementById('mr-notes').checked;
+  if(!monthInput){showToast('Pick a month');return;}
+  var btn=document.getElementById('mr-btn');
+  btn.disabled=true;btn.textContent='Loading...';
+
+  var year=parseInt(monthInput.split('-')[0]);
+  var monthNum=parseInt(monthInput.split('-')[1]);
+  var firstDay=monthInput+'-01';
+  var daysInMonth=new Date(year,monthNum,0).getDate();
+  var lastDay=monthInput+'-'+String(daysInMonth).padStart(2,'0');
+
+  var FR=pdfLang==='fr';
+  var L={
+    title: FR?'BranChef — Rapport de présence':'BranChef — Attendance Report',
+    days: FR?['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    headers: FR?['Jour','Entrée','Sortie','Durée','Statut']:['Day','Clock In','Clock Out','Duration','Status'],
+    absent: FR?'Absent':'Absent',
+    complete: FR?'Complet':'Complete',
+    noClockOut: FR?'Pas de sortie':'No clock-out',
+    summary: function(w,a,m,h,mi){
+      return FR
+        ?'Jours travaillés: '+w+'   |   Jours absents: '+a+'   |   Sorties manquées: '+m+'   |   Total: '+h+'h '+mi+'m'
+        :'Days worked: '+w+'   |   Days absent: '+a+'   |   Missed clock-outs: '+m+'   |   Total: '+h+'h '+mi+'m';
+    }
+  };
+
+  db.collection('clock').where('date','>=',firstDay).where('date','<=',lastDay).get().then(function(snap){
+    var allEntries=[];
+    snap.forEach(function(d){allEntries.push(d.data());});
+
+    var names=emp==='__all__'?Object.values(TEAM).map(function(t){return t.name;}):[emp];
+    var doc=new window.jspdf.jsPDF({unit:'pt',format:'a4'});
+    var monthName=new Date(year,monthNum-1,1).toLocaleDateString(FR?'fr-CA':'en-US',{month:'long',year:'numeric'});
+
+    names.forEach(function(empName,idx){
+      if(idx>0)doc.addPage();
+
+      doc.setFontSize(18);doc.setTextColor(124,58,237);
+      doc.text(L.title,40,46);
+      doc.setFontSize(13);doc.setTextColor(40,40,40);
+      doc.text(empName,40,68);
+      doc.setFontSize(10);doc.setTextColor(120,120,120);
+      doc.text(monthName,40,84);
+
+      var empEntries=allEntries.filter(function(e){return e.userName===empName;});
+      var totalMs=0,worked=0,missed=0,absent=0;
+      var body=[],notes=[];
+
+      for(var day=1;day<=daysInMonth;day++){
+        var dateStr=monthInput+'-'+String(day).padStart(2,'0');
+        var dObj=new Date(year,monthNum-1,day);
+        var dayLabel=L.days[dObj.getDay()]+' '+day;
+        var dayEntries=empEntries.filter(function(e){return e.date===dateStr;});
+
+        if(!dayEntries.length){
+          body.push([dayLabel,'—','—','—',L.absent]);
+          absent++;continue;
+        }
+        worked++;
+        var dayMs=0,inTimes=[],outTimes=[],missedOut=false,tasks=[],feelings=[];
+        dayEntries.forEach(function(e){
+          if(e.clockIn)inTimes.push(e.clockIn.toDate());
+          if(e.clockOut){outTimes.push(e.clockOut.toDate());}
+          else if(e.clockIn){missedOut=true;}
+          if(e.clockIn&&e.clockOut)dayMs+=e.clockOut.toDate()-e.clockIn.toDate();
+          if(e.endOfDayTasks)tasks.push(e.endOfDayTasks);
+          if(e.endOfDayFeeling)feelings.push(e.endOfDayFeeling);
+        });
+        totalMs+=dayMs;if(missedOut)missed++;
+        var fmt=function(t){return t.toLocaleTimeString('en-CA',{hour12:false,hour:'2-digit',minute:'2-digit'});};
+        var inS=inTimes.length?inTimes.map(fmt).join(', '):'—';
+        var outS=outTimes.length?outTimes.map(fmt).join(', '):(missedOut?'⚠ —':'—');
+        var h=Math.floor(dayMs/3600000),m=Math.floor((dayMs%3600000)/60000);
+        var dur=dayMs>0?(h>0?h+'h '+m+'m':m+'m'):'—';
+        var status=missedOut?L.noClockOut:L.complete;
+        body.push([dayLabel,inS,outS,dur,status]);
+        if(includeNotes&&(tasks.length||feelings.length))
+          notes.push([dayLabel,tasks.join(' / ')||'—',feelings.join(' / ')||'—']);
+      }
+
+      var th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);
+      doc.setFontSize(8.5);doc.setTextColor(90,90,90);
+      doc.text(L.summary(worked,absent,missed,th,tm),40,100);
+
+      doc.autoTable({
+        startY:114,head:[L.headers],body:body,
+        styles:{fontSize:8,cellPadding:4},
+        headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'},
+        alternateRowStyles:{fillColor:[248,247,255]},
+        columnStyles:{0:{cellWidth:70},4:{cellWidth:90}},
+        didParseCell:function(d){
+          if(d.section==='body'){
+            if(d.row.raw[4]===L.absent)d.cell.styles.textColor=[180,30,30];
+            else if(d.row.raw[4]===L.noClockOut)d.cell.styles.textColor=[200,120,0];
+            else if(d.row.raw[4]===L.complete)d.cell.styles.textColor=[20,140,80];
+          }
+        }
+      });
+
+      if(includeNotes&&notes.length){
+        var y=doc.lastAutoTable.finalY+20;
+        if(y>700){doc.addPage();y=46;}
+        doc.setFontSize(11);doc.setTextColor(124,58,237);
+        doc.text(FR?'Notes de fin de journée':'End-of-day notes',40,y);
+        doc.autoTable({
+          startY:y+10,
+          head:[[FR?'Jour':'Day',FR?'Tâches':'Tasks',FR?'Journée':'Day']],
+          body:notes,
+          styles:{fontSize:7.5,cellPadding:4},
+          headStyles:{fillColor:[40,40,60],textColor:255},
+          columnStyles:{0:{cellWidth:60},1:{cellWidth:220},2:{cellWidth:180}}
+        });
+      }
     });
-    el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Total</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+    var fname='BranChef_Attendance_'+(emp==='__all__'?'AllStaff':emp)+'_'+monthInput+'.pdf';
+    doc.save(fname);
+    showToast('PDF downloaded!');
+    btn.disabled=false;btn.textContent='📄 Download PDF';
+    document.getElementById('mr-status').textContent='Downloaded: '+fname;
+  }).catch(function(e){
+    showToast('Error: '+e.message);
+    btn.disabled=false;btn.textContent='📄 Download PDF';
   });
 }
+
 
 function adminEmailJS(){
   document.getElementById('ma-title').textContent='📧 Email Notifications Setup';
