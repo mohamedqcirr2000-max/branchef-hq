@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BranChef — Brand Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --bg:#08080A; --panel:#101014; --panel-2:#16161C; --line:#22222B; --line-soft:#1A1A22;
+  --ink:#F4F4F6; --ink-2:#A4A4B2; --ink-3:#6C6C7C;
+  --violet:#7C3AED; --pink:#DB2777; --grad:linear-gradient(120deg,#7C3AED,#DB2777);
+  --green:#34D399; --red:#F87171; --amber:#FBBF24; --blue:#60A5FA; --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;padding-bottom:70px}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+
+.top{position:sticky;top:0;z-index:60;background:rgba(8,8,10,.9);backdrop-filter:blur(14px);border-bottom:1px solid var(--line-soft)}
+.top-in{max-width:1280px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mark{line-height:1}
+.mark img{height:25px;width:auto;display:block}
+.mark small{display:block;font-family:'Inter';font-weight:600;font-size:9px;letter-spacing:2.3px;color:var(--ink-3);margin-top:6px;padding-left:2px}
+.langs{margin-left:auto;display:flex;gap:5px}
+.lang{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-3);border-radius:999px;padding:5px 13px;font-size:11.5px;font-weight:700;transition:.15s}
+.lang[data-on="1"]{background:var(--grad);border-color:transparent;color:#fff}
+
+.wrap{max-width:1280px;margin:0 auto;padding:24px 22px}
+.hero{margin:10px 0 26px}
+.hero h1{font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(26px,4.6vw,42px);line-height:.99;letter-spacing:-1.5px;text-transform:uppercase}
+.hero h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--ink-2);margin-top:11px;max-width:660px;font-size:14px;line-height:1.6}
+
+.step{background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+.step-h{padding:15px 18px;display:flex;align-items:flex-start;gap:14px;border-bottom:1px solid var(--line-soft)}
+.step-n{width:26px;height:26px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-family:'IBM Plex Mono';font-size:12px;font-weight:600;flex-shrink:0}
+.step-h h2{font-family:'Archivo';font-weight:800;font-size:14.5px;letter-spacing:-.2px}
+.step-h p{color:var(--ink-3);font-size:12.5px;margin-top:4px;line-height:1.6}
+.step-b{padding:16px 18px}
+
+label{display:block;font-size:10px;letter-spacing:1.1px;color:var(--ink-3);font-weight:700;margin-bottom:6px;text-transform:uppercase}
+input[type=text],textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 13px;font-size:13.5px}
+input[type=text]:focus,textarea:focus{border-color:var(--violet);outline:none}
+textarea{min-height:160px;resize:vertical;font-family:'IBM Plex Mono';font-size:12px;line-height:1.6}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:9px;margin-top:14px}
+.plat{display:flex;align-items:center;gap:11px;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:11px 13px;transition:.15s;text-decoration:none}
+.plat:hover{border-color:var(--violet);background:#1B1622;text-decoration:none}
+.plat .ico{width:32px;height:32px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-family:'IBM Plex Mono';font-size:11.5px;font-weight:600;color:#fff;flex-shrink:0}
+.plat .t{font-size:13px;font-weight:600;color:var(--ink)}
+.plat .s{font-size:11px;color:var(--ink-3);margin-top:1px}
+
+.btn{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 16px;font-size:12.5px;font-weight:600;transition:.15s;white-space:nowrap}
+.btn:hover{background:#1E1E26;border-color:#31313D}
+.btn.primary{background:var(--grad);border:none;color:#fff}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.sm{padding:6px 11px;font-size:11.5px;border-radius:8px}
+.btn.danger{color:var(--red);border-color:#3A1F24}
+.btn.danger:hover{background:#25151A}
+.btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+
+.tip{background:#0E0C16;border:1px solid #241C33;border-left:3px solid var(--violet);border-radius:0 10px 10px 0;padding:11px 14px;font-size:12.5px;color:var(--ink-2);line-height:1.65;margin-top:14px}
+.status{border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:600;margin-top:13px;display:none}
+.status.on{display:block}
+.status.ok{background:#0B2418;color:var(--green);border:1px solid #17422C}
+.status.warn{background:#241B06;color:var(--amber);border:1px solid #453214}
+.status.bad{background:#2A1216;color:var(--red);border:1px solid #4A1F26}
+
+.tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;margin-bottom:16px}
+.tcell{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:13px 15px}
+.tcell .k{font-size:9.5px;letter-spacing:1.3px;color:var(--ink-3);font-weight:700;text-transform:uppercase}
+.tcell .v{font-family:'IBM Plex Mono';font-size:20px;font-weight:600;margin-top:6px}
+.tcell.p .v{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.scroll{max-height:640px;overflow:auto;border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:9.5px;letter-spacing:1.2px;color:var(--ink-3);font-weight:700;text-transform:uppercase;text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+td{padding:9px 11px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tr:hover td{background:#14141A}
+td.n{font-family:'IBM Plex Mono';color:var(--ink-3);width:34px}
+.addr{font-weight:600}
+.sub{color:var(--ink-3);font-size:11px;font-family:'IBM Plex Mono';margin-top:2px}
+.badge{border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:.5px;font-family:'IBM Plex Mono';white-space:nowrap;display:inline-block}
+.b-ca{background:#2A1216;color:#FB7185}
+.b-us{background:#0B1E33;color:#60A5FA}
+.b-uk{background:#12082A;color:#A78BFA}
+.b-fr{background:#0B2E1C;color:#4ADE80}
+.b-eu{background:#241B06;color:#FBBF24}
+.b-x{background:#26262E;color:var(--ink-3)}
+.conf{font-size:9.5px;font-family:'IBM Plex Mono';padding:1px 5px;border-radius:5px;margin-left:6px}
+.c-hi{background:#0B2418;color:var(--green)}
+.c-md{background:#241B06;color:var(--amber)}
+.c-lo{background:#26262E;color:var(--ink-3)}
+
+.empty{text-align:center;padding:44px 20px;color:var(--ink-3)}
+.empty h3{font-family:'Archivo';font-weight:800;font-size:16px;color:var(--ink-2);margin-bottom:7px}
+.back{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(155,89,255,.14);border:1px solid rgba(155,89,255,.4);color:#9B59FF;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700}
+.back:hover{text-decoration:none;background:rgba(155,89,255,.24)}
+#gate{position:fixed;inset:0;z-index:999;background:var(--bg);display:grid;place-items:center;text-align:center;padding:30px}
+@media(max-width:760px){ th:nth-child(5),td:nth-child(5){display:none} }
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="gate"><div>
+  <div id="gateMsg" style="color:var(--ink-2);font-size:14px">Checking your BranChef session…</div>
+  <a id="gateLink" href="/index.html" class="btn primary" style="display:none;margin-top:16px">Sign in to BranChef HQ</a>
+</div></div>
+
+<header class="top"><div class="top-in">
+  <div class="mark"><img src="/logo.jpg" alt="BranChef" /><small>BRAND RADAR</small></div>
+  <div class="langs">
+    <button class="lang" data-on="1" id="l-en" onclick="setLang('en')">EN</button>
+    <button class="lang" id="l-fr" onclick="setLang('fr')">FR</button>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <div class="hero">
+    <h1 id="h-title"></h1>
+    <p id="h-sub"></p>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-h"><div class="step-n">1</div>
+      <div><h2 id="s1-t"></h2><p id="s1-d"></p></div></div>
+    <div class="step-b">
+      <label id="s1-l"></label>
+      <input type="text" id="brand" value="Brooklyn Calzones" oninput="buildSearches()" />
+      <div class="grid" id="searches"></div>
+      <div class="tip" id="s1-tip"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-h"><div class="step-n">2</div>
+      <div><h2 id="s2-t"></h2><p id="s2-d"></p></div></div>
+    <div class="step-b">
+      <label id="s2-l"></label>
+      <textarea id="paste" spellcheck="false"></textarea>
+      <div class="btns">
+        <button class="btn primary" onclick="parseAll()" id="b-extract"></button>
+        <button class="btn" onclick="exportCSV()" id="b-csv" style="display:none"></button>
+        <button class="btn" onclick="exportPDF()" id="b-pdf" style="display:none"></button>
+        <button class="btn danger" onclick="clearAll()" id="b-clear"></button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="totals" class="tot"></div>
+  <div class="step" id="resWrap" style="display:none">
+    <div class="step-h"><div class="step-n">3</div>
+      <div><h2 id="s3-t"></h2><p id="s3-d"></p></div></div>
+    <div class="step-b"><div class="scroll"><table id="tbl"><thead id="thead"></thead><tbody></tbody></table></div></div>
+  </div>
+  <div id="emptyBox"></div>
+</div>
+
+<a href="/index.html" class="back">← BranChef HQ</a>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   BranChef — Brand Radar
+   Paste Google results, get every location of a brand, cleaned up.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ---------- owner gate (same session as HQ) ------------------- */
+var OWNERS=["simo.chatei@getbranchef.com","nadirkassimi@getbranchef.com"];
+firebase.initializeApp({
+  apiKey:"AIzaSyAofsIEnR6WclsU0ELmv8L_vd4mkfn8EuY",
+  authDomain:"branchef-app.firebaseapp.com",
+  projectId:"branchef-app",
+  storageBucket:"branchef-app.firebasestorage.app",
+  messagingSenderId:"485634496376",
+  appId:"1:485634496376:web:f7ea1f814c0faa37c1da8d"
+});
+firebase.auth().onAuthStateChanged(function(u){
+  var g=document.getElementById('gate');
+  if(u && OWNERS.indexOf(u.email)>=0){ g.parentNode.removeChild(g); return; }
+  document.getElementById('gateMsg').textContent =
+    u ? 'Owners only — this section is restricted.' : 'Sign in to BranChef HQ to open Brand Radar.';
+  document.getElementById('gateLink').style.display='inline-block';
+});
+
+/* ---------- language ------------------------------------------ */
+var L={
+ en:{
+  title:'Find every location.<em> One brand at a time.</em>',
+  sub:'Open the ready-made Google search for each delivery platform, copy the results page, paste it below. Every store address gets pulled out, cleaned, de-duplicated and country-tagged.',
+  s1t:'Brand name and platforms', s1d:'Type the brand, then open each platform search in a new tab.',
+  s1l:'Brand name', s1tip:'In each search window, scroll to the bottom and click through the page numbers (2, 3, 4…). Google shows roughly 30 pages. The more pages you open, the more locations you get when you paste.',
+  s2t:'Copy the results page and paste it here', s2d:'In the Google window press Cmd+A then Cmd+C, and paste here with Cmd+V. Repeat for each platform and each page — pasting on top of previous text is fine.',
+  s2l:'Paste your search result pages (paste as many times as you like)',
+  s2ph:'Paste everything you copied from Google here — several pages and platforms in a row is fine.',
+  extract:'Find locations', csv:'Download CSV', pdf:'Download PDF', clear:'Clear all',
+  s3t:'Locations found', s3d:'Sorted by country. Confidence shows how certain the address parse is.',
+  th:['#','Platform','Country','Address','Source','Map'],
+  open:'Open store', map:'Map',
+  k_total:'Locations', k_addr:'With address', k_ca:'Canada', k_us:'USA', k_other:'Elsewhere',
+  empty_t:'Nothing found yet', empty_d:'Open a platform search above, copy the whole results page, and paste it in step 2.',
+  st_none:'Paste your search results into the box above first.',
+  st_ok:function(n,t){return n+' new location'+(n===1?'':'s')+' added — '+t+' total.';},
+  st_dup:'No new locations — everything in that paste was already in the table.',
+  st_nourl:'No store links found in that text. Make sure you copied the whole Google results page (Cmd+A), not just part of it.',
+  gsearch:'General search', gmaps:'Google Maps', gopen:'Open Google search',
+  conf_hi:'exact', conf_md:'partial', conf_lo:'guess'
+ },
+ fr:{
+  title:'Trouvez chaque adresse.<em> Une marque à la fois.</em>',
+  sub:'Ouvrez la recherche Google prête pour chaque plateforme de livraison, copiez la page de résultats et collez-la ci-dessous. Chaque adresse est extraite, nettoyée, dédupliquée et associée à un pays.',
+  s1t:'Nom de la marque et plateformes', s1d:'Écrivez la marque, puis ouvrez la recherche de chaque plateforme dans un nouvel onglet.',
+  s1l:'Nom de la marque', s1tip:'Dans chaque fenêtre de recherche, descendez en bas de page et cliquez sur les numéros de page (2, 3, 4…). Google affiche environ 30 pages. Plus vous en ouvrez, plus vous obtenez d\u2019adresses.',
+  s2t:'Copiez la page de résultats et collez-la ici', s2d:'Dans la fenêtre Google, faites Cmd+A puis Cmd+C, et collez ici avec Cmd+V. Répétez pour chaque plateforme et chaque page — coller par-dessus le texte précédent ne pose aucun problème.',
+  s2l:'Collez vos pages de résultats (autant de fois que vous voulez)',
+  s2ph:'Collez ici tout ce que vous avez copié depuis Google — plusieurs pages et plateformes à la suite, sans souci.',
+  extract:'Trouver les adresses', csv:'Télécharger CSV', pdf:'Télécharger PDF', clear:'Tout effacer',
+  s3t:'Adresses trouvées', s3d:'Triées par pays. La fiabilité indique la certitude de l\u2019extraction.',
+  th:['#','Plateforme','Pays','Adresse','Source','Carte'],
+  open:'Ouvrir', map:'Carte',
+  k_total:'Adresses', k_addr:'Avec adresse', k_ca:'Canada', k_us:'États-Unis', k_other:'Ailleurs',
+  empty_t:'Rien pour l\u2019instant', empty_d:'Ouvrez une recherche ci-dessus, copiez toute la page de résultats et collez-la à l\u2019étape 2.',
+  st_none:'Collez d\u2019abord vos résultats de recherche dans la case ci-dessus.',
+  st_ok:function(n,t){return n+' nouvelle'+(n===1?'':'s')+' adresse'+(n===1?'':'s')+' ajoutée'+(n===1?'':'s')+' — '+t+' au total.';},
+  st_dup:'Aucune nouveauté — tout était déjà dans le tableau.',
+  st_nourl:'Aucun lien de magasin trouvé. Vérifiez que vous avez copié toute la page Google (Cmd+A), pas seulement une partie.',
+  gsearch:'Recherche générale', gmaps:'Google Maps', gopen:'Ouvrir la recherche Google',
+  conf_hi:'exacte', conf_md:'partielle', conf_lo:'estimée'
+ }
+};
+var lang = localStorage.getItem('bc_radar_lang') || 'en';
+function T(){ return L[lang]; }
+function setLang(x){
+  lang=x; try{localStorage.setItem('bc_radar_lang',x);}catch(e){}
+  document.getElementById('l-en').setAttribute('data-on', x==='en'?'1':'0');
+  document.getElementById('l-fr').setAttribute('data-on', x==='fr'?'1':'0');
+  document.documentElement.lang=x;
+  paint();
+}
+function paint(){
+  var t=T();
+  document.getElementById('h-title').innerHTML=t.title;
+  document.getElementById('h-sub').textContent=t.sub;
+  document.getElementById('s1-t').textContent=t.s1t;
+  document.getElementById('s1-d').textContent=t.s1d;
+  document.getElementById('s1-l').textContent=t.s1l;
+  document.getElementById('s1-tip').textContent='💡 '+t.s1tip;
+  document.getElementById('s2-t').textContent=t.s2t;
+  document.getElementById('s2-d').textContent=t.s2d;
+  document.getElementById('s2-l').textContent=t.s2l;
+  document.getElementById('paste').placeholder=t.s2ph;
+  document.getElementById('b-extract').textContent=t.extract;
+  document.getElementById('b-csv').textContent=t.csv;
+  document.getElementById('b-pdf').textContent=t.pdf;
+  document.getElementById('b-clear').textContent=t.clear;
+  document.getElementById('s3-t').textContent=t.s3t;
+  document.getElementById('s3-d').textContent=t.s3d;
+  buildSearches(); render();
+}
+
+/* ---------- platforms ----------------------------------------- */
+var PLATFORMS=[
+  {key:'ubereats.com',      name:'Uber Eats',     abbr:'UE'},
+  {key:'doordash.com',      name:'DoorDash',      abbr:'DD'},
+  {key:'skipthedishes.com', name:'SkipTheDishes', abbr:'SK'},
+  {key:'grubhub.com',       name:'Grubhub',       abbr:'GH'},
+  {key:'deliveroo.co.uk',   name:'Deliveroo UK',  abbr:'DL'},
+  {key:'deliveroo.fr',      name:'Deliveroo FR',  abbr:'DL'},
+  {key:'order.online',      name:'Order.online',  abbr:'OO'}
+];
+var rows=[];
+
+/* ---------- address parsing ----------------------------------- */
+/* Postal codes are the most reliable country signal there is —
+   far better than guessing from a city name. */
+var CA_POSTAL=/\b([ABCEGHJKLMNPRSTVXY]\d[ABCEGHJKLMNPRSTVWXYZ])\s?(\d[ABCEGHJKLMNPRSTVWXYZ]\d)\b/i;
+var US_ZIP=/\b(\d{5})(?:-\d{4})?\b/;
+var UK_POSTAL=/\b([A-Z]{1,2}\d[A-Z\d]?)\s?(\d[A-Z]{2})\b/;
+
+var CA_PROV=['ON','QC','BC','AB','MB','SK','NS','NB','NL','PE','YT','NT','NU'];
+var US_STATE=['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+ 'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN',
+ 'TX','UT','VT','VA','WA','WV','WI','WY','DC'];
+
+/* street types in English and French, so "123 Rue Saint-Denis" parses too */
+var STREET='(?:St|Street|Rue|Ave|Av|Avenue|Blvd|Boul|Boulevard|Rd|Road|Dr|Drive|Way|Ln|Lane|Ct|Court|Cres|Crescent|Pl|Place|Pkwy|Parkway|Hwy|Highway|Ch|Chemin|Terr|Terrace|Sq|Square|Trail|Tr|Cir|Circle|Mall|Row|Walk|Gate)';
+
+var JUNK=/based on your places|update location|try without|results are personalized|send feedback|^help$|privacy|terms|settings|sign in|your places|opening hours|order online|see more|people also|related searches|images for|videos for|about \d+ results|next page|previous/i;
+
+function normSpace(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+
+/* returns {address, city, region, postal, country, cc, confidence} */
+function extractAddress(line){
+  var out={address:'',city:'',region:'',postal:'',country:'',cc:'b-x',conf:0};
+  if(!line || JUNK.test(line)) return out;
+
+  /* --- postal code first: it names the country on its own --- */
+  var ca=line.match(CA_POSTAL), uk=line.match(UK_POSTAL), us=null;
+  if(ca){ out.postal=(ca[1]+' '+ca[2]).toUpperCase(); out.country='Canada'; out.cc='b-ca'; }
+  else if(uk && /,\s*(London|Manchester|Birmingham|Leeds|Liverpool|Bristol|Glasgow|Edinburgh|Sheffield|Cardiff)/i.test(line)){
+    out.postal=(uk[1]+' '+uk[2]).toUpperCase(); out.country='UK'; out.cc='b-uk';
+  } else {
+    us=line.match(US_ZIP);
+  }
+
+  /* --- full block: "6355 Airport Rd, Mississauga, ON L4V 1E3" --- */
+  var full=line.match(new RegExp(
+    '(\\d+[A-Za-z]?(?:\\s*-\\s*\\d+[A-Za-z]?)?\\s+[\\dA-Za-zÀ-ÿ][\\wÀ-ÿ.\\-\\/\' ]{2,55}?)' +
+    ',\\s*([A-ZÀ-Ý][a-zA-ZÀ-ÿ.\'\\-]+(?:[\\s\\-][A-ZÀ-Ýa-z][a-zA-ZÀ-ÿ.\'\\-]+){0,3})' +
+    ',?\\s*\\b([A-Z]{2})\\b'
+  ));
+  if(full && /[A-Za-zÀ-ÿ]{2}/.test(full[1])){
+    out.address=normSpace(full[1]);
+    out.city=normSpace(full[2]);
+    out.region=full[3];
+    out.conf=3;
+  }
+
+  /* --- address in parentheses: "Brooklyn Calzones (4986 Dundas Street West)" --- */
+  if(!out.address){
+    var par=line.match(/\((\d+[A-Za-z]?(?:\s*-\s*\d+[A-Za-z]?)?\s[^)]{4,70})\)/);
+    if(par && !/^\d+\s*(min|km|mi|reviews?|ratings?)/i.test(par[1])){
+      out.address=normSpace(par[1]); out.conf=2;
+    }
+  }
+
+  /* --- bare street line: "123 Rue Saint-Denis" --- */
+  if(!out.address){
+    var bare=line.match(new RegExp('\\b(\\d+[A-Za-z]?(?:\\s*-\\s*\\d+[A-Za-z]?)?\\s+(?:'+
+      '(?:[\\dA-Za-zÀ-ÿ][\\wÀ-ÿ.\'\\-]*[A-Za-zÀ-ÿ][\\wÀ-ÿ.\'\\-]*\\s+){0,4}'+STREET+'\\.?'+
+      '(?:\\s+(?:N|S|E|W|NE|NW|SE|SW|Nord|Sud|Est|Ouest))?))\\b','i'));
+    if(bare){ out.address=normSpace(bare[1]); out.conf=2; }
+  }
+
+  /* --- city from "... in Toronto" when we have nothing better --- */
+  if(!out.city){
+    var cm=line.match(/\bin\s+([A-ZÀ-Ý][a-zA-ZÀ-ÿ.'\-]+(?:[\s\-][A-ZÀ-Ýa-z][a-zA-ZÀ-ÿ.'\-]+){0,2})\b/);
+    if(cm) out.city=normSpace(cm[1]);
+  }
+
+  /* --- settle the country --- */
+  if(!out.country){
+    if(out.region && CA_PROV.indexOf(out.region)>=0){ out.country='Canada'; out.cc='b-ca'; }
+    else if(out.region && US_STATE.indexOf(out.region)>=0){ out.country='USA'; out.cc='b-us'; }
+    else if(us){ out.country='USA'; out.cc='b-us'; out.postal=us[1]; }
+  }
+  if(out.country==='Canada' && !out.postal && ca) out.postal=(ca[1]+' '+ca[2]).toUpperCase();
+  if(out.country==='USA' && !out.postal && us) out.postal=us[1];
+
+  /* confidence: exact when the address carries a postal or a valid region */
+  if(out.address && (out.postal || (out.region && (CA_PROV.indexOf(out.region)>=0||US_STATE.indexOf(out.region)>=0)))) out.conf=3;
+  else if(out.address && out.city) out.conf=2;
+  else if(out.address) out.conf=1;
+
+  return out;
+}
+
+/* the URL slug is the fallback when the result text gave us nothing */
+function addrHint(u){
+  try{
+    var url=new URL(u), segs=url.pathname.split('/').filter(Boolean);
+    var cand=null;
+    for(var i=0;i<segs.length;i++){
+      var s=segs[i];
+      if(/\d/.test(s) && s.indexOf('-')>=0 && s.length>8){ cand=s; break; }
+    }
+    if(!cand && segs.length) cand=segs[segs.length-2]||segs[segs.length-1];
+    if(!cand) return '';
+    return normSpace(cand.replace(/-/g,' ').replace(/\b(store|restaurant|menu|brand|city|order|food|delivery)\b/gi,''))
+      .replace(/\b[0-9a-f]{8,}\b/gi,'').trim();
+  }catch(e){ return ''; }
+}
+
+function countryFromUrl(u){
+  try{
+    var url=new URL(u), host=url.hostname, path=url.pathname;
+    if(host.indexOf('deliveroo.co.uk')>=0) return {t:'UK',c:'b-uk'};
+    if(host.indexOf('deliveroo.fr')>=0)    return {t:'France',c:'b-fr'};
+    if(host.indexOf('deliveroo.')>=0)      return {t:'Europe',c:'b-eu'};
+    if(host.indexOf('skipthedishes')>=0)   return {t:'Canada',c:'b-ca'};
+    if(host.indexOf('grubhub')>=0)         return {t:'USA',c:'b-us'};
+    var m=path.match(/^\/([a-z]{2})(?:-[a-z]{2})?\//);
+    if(m){
+      var map={fr:['France','b-fr'],ca:['Canada','b-ca'],gb:['UK','b-uk'],uk:['UK','b-uk'],
+        es:['Spain','b-eu'],de:['Germany','b-eu'],it:['Italy','b-eu'],pt:['Portugal','b-eu'],
+        nl:['Netherlands','b-eu'],be:['Belgium','b-eu'],ie:['Ireland','b-eu'],
+        au:['Australia','b-x'],mx:['Mexico','b-x'],jp:['Japan','b-x'],nz:['New Zealand','b-x']};
+      if(map[m[1]]) return {t:map[m[1]][0],c:map[m[1]][1]};
+    }
+  }catch(e){}
+  return {t:'—',c:'b-x'};     /* unknown stays unknown — never guessed as USA */
+}
+
+function platformFromUrl(u){
+  for(var i=0;i<PLATFORMS.length;i++) if(u.indexOf(PLATFORMS[i].key)>=0) return PLATFORMS[i].name;
+  return '—';
+}
+function isStoreUrl(u){
+  return /\/store\/|\/restaurant\/|\/menu\/|\/brand-city\/|skipthedishes\.com\/[a-z0-9-]{4,}|deliveroo\.[a-z.]+\/(menu|brands)|order\.online\/[a-z0-9-]{4,}|grubhub\.com\/restaurant\//i.test(u);
+}
+
+/* ---------- searches ------------------------------------------ */
+function buildSearches(){
+  var b=document.getElementById('brand').value.trim(), t=T();
+  var box=document.getElementById('searches');
+  if(!b){ box.innerHTML=''; return; }
+  var q=encodeURIComponent('"'+b+'"');
+  var h=PLATFORMS.map(function(p){
+    return '<a class="plat" target="_blank" rel="noopener" href="https://www.google.com/search?q='+q+'+site:'+p.key+'&num=30">'
+      +'<div class="ico">'+p.abbr+'</div><div><div class="t">'+p.name+'</div><div class="s">'+t.gopen+'</div></div></a>';
+  }).join('');
+  h+='<a class="plat" target="_blank" rel="noopener" href="https://www.google.com/search?q='+q+'+delivery&num=30">'
+    +'<div class="ico">G</div><div><div class="t">'+t.gsearch+'</div><div class="s">'+t.gopen+'</div></div></a>'
+    +'<a class="plat" target="_blank" rel="noopener" href="https://www.google.com/maps/search/'+q+'">'
+    +'<div class="ico">📍</div><div><div class="t">'+t.gmaps+'</div><div class="s">'+t.gopen+'</div></div></a>';
+  box.innerHTML=h;
+}
+
+/* ---------- parse --------------------------------------------- */
+function setStatus(cls,msg){
+  var s=document.getElementById('status');
+  s.className='status on '+cls; s.textContent=msg;
+}
+function parseAll(){
+  var text=document.getElementById('paste').value, t=T();
+  if(!text.trim()){ setStatus('warn',t.st_none); return; }
+
+  var lines=text.split('\n').map(function(l){return l.trim();});
+  var platRe=PLATFORMS.map(function(p){return p.key.replace('.','\\.');}).join('|');
+  var urlRe=new RegExp('https?:\\/\\/[^\\s"\'<>\\)\\]]*(?:'+platRe+')[^\\s"\'<>\\)\\]]*','gi');
+
+  var seenUrl={}, addrIdx={};
+  rows.forEach(function(r){
+    if(r.url) seenUrl[r.url]=1;
+    if(r.address) addrIdx[r.address.toLowerCase().replace(/\s+/g,' ')]=r;
+  });
+
+  var added=0, sawUrl=false;
+
+  /* addresses usually sit within a couple of lines of their link,
+     so carry the most recent link forward as we walk the page */
+  var recentUrl='';
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    var um=line.match(urlRe);
+    if(um){
+      sawUrl=true;
+      for(var j=0;j<um.length;j++){
+        var u=um[j].replace(/[.,;]+$/,'');
+        if(!isStoreUrl(u)) continue;
+        recentUrl=u;
+        if(seenUrl[u]) continue;
+        seenUrl[u]=1;
+        var c=countryFromUrl(u);
+        rows.push({url:u, platform:platformFromUrl(u), address:'', city:'', region:'', postal:'',
+                   country:c.t, cc:c.c, hint:addrHint(u), conf:0});
+        added++;
+      }
+    }
+    /* try this line as an address and attach it to the newest link */
+    var a=extractAddress(line);
+    if(a.address){
+      var key=a.address.toLowerCase().replace(/\s+/g,' ');
+      var target=null;
+      for(var k=rows.length-1;k>=0;k--){
+        if(rows[k].url===recentUrl){ target=rows[k]; break; }
+      }
+      if(addrIdx[key]){
+        var ex=addrIdx[key];
+        if(!ex.city && a.city) ex.city=a.city;
+        if(!ex.postal && a.postal) ex.postal=a.postal;
+        if(a.conf>ex.conf) ex.conf=a.conf;
+      } else if(target && !target.address){
+        target.address=a.address; target.city=a.city; target.region=a.region;
+        target.postal=a.postal; target.conf=a.conf;
+        if(a.country){ target.country=a.country; target.cc=a.cc; }
+        addrIdx[key]=target;
+      } else if(!target){
+        rows.push({url:'', platform:'—', address:a.address, city:a.city, region:a.region,
+                   postal:a.postal, country:a.country||'—', cc:a.cc, hint:'', conf:a.conf});
+        addrIdx[key]=rows[rows.length-1];
+        added++;
+      }
+    }
+  }
+
+  if(!added && !sawUrl){ setStatus('bad',t.st_nourl); }
+  else if(!added){ setStatus('warn',t.st_dup); }
+  else { setStatus('ok', t.st_ok(added, rows.length)); }
+  render();
+}
+
+function clearAll(){
+  rows=[];
+  document.getElementById('paste').value='';
+  document.getElementById('status').className='status';
+  render();
+}
+
+/* ---------- render -------------------------------------------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+function render(){
+  var t=T();
+  var order={'Canada':1,'USA':2,'UK':3,'France':4,'Europe':5};
+  rows.sort(function(a,b){
+    var oa=order[a.country]||9, ob=order[b.country]||9;
+    if(oa!==ob) return oa-ob;
+    return (a.city||'').localeCompare(b.city||'');
+  });
+
+  document.getElementById('b-csv').style.display=rows.length?'':'none';
+  document.getElementById('b-pdf').style.display=rows.length?'':'none';
+  document.getElementById('resWrap').style.display=rows.length?'':'none';
+  document.getElementById('emptyBox').innerHTML = rows.length ? '' :
+    '<div class="step"><div class="empty"><h3>'+esc(t.empty_t)+'</h3><p>'+esc(t.empty_d)+'</p></div></div>';
+
+  var withAddr=rows.filter(function(r){return r.address;}).length;
+  var ca=rows.filter(function(r){return r.country==='Canada';}).length;
+  var us=rows.filter(function(r){return r.country==='USA';}).length;
+  document.getElementById('totals').innerHTML = rows.length ?
+      cell(t.k_total,rows.length,'p')+cell(t.k_addr,withAddr)+cell(t.k_ca,ca)
+    + cell(t.k_us,us)+cell(t.k_other,rows.length-ca-us) : '';
+
+  document.getElementById('thead').innerHTML='<tr>'+t.th.map(function(x){return '<th>'+esc(x)+'</th>';}).join('')+'</tr>';
+
+  var brand=document.getElementById('brand').value.trim();
+  document.querySelector('#tbl tbody').innerHTML=rows.map(function(r,i){
+    var sub=[r.city,r.region,r.postal].filter(Boolean).join(', ');
+    var badge = r.conf>=3?'<span class="conf c-hi">'+t.conf_hi+'</span>'
+              : r.conf===2?'<span class="conf c-md">'+t.conf_md+'</span>'
+              : r.address?'<span class="conf c-lo">'+t.conf_lo+'</span>':'';
+    var addrCell = r.address
+      ? '<span class="addr">'+esc(r.address)+'</span>'+badge+(sub?'<div class="sub">'+esc(sub)+'</div>':'')
+      : (r.hint? '<span style="color:var(--ink-3)">'+esc(r.hint)+'</span>'+badge : '<span style="color:var(--ink-3)">—</span>');
+    var q=encodeURIComponent((r.address||r.hint||'')+' '+(r.city||'')+' '+brand);
+    return '<tr><td class="n">'+(i+1)+'</td>'
+      +'<td>'+esc(r.platform)+'</td>'
+      +'<td><span class="badge '+r.cc+'">'+esc(r.country)+'</span></td>'
+      +'<td>'+addrCell+'</td>'
+      +'<td>'+(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+t.open+' ↗</a>':'<span style="color:var(--ink-3)">—</span>')+'</td>'
+      +'<td><a href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener">'+t.map+' ↗</a></td></tr>';
+  }).join('');
+}
+function cell(k,v,c){ return '<div class="tcell '+(c||'')+'"><div class="k">'+esc(k)+'</div><div class="v">'+v+'</div></div>'; }
+
+/* ---------- export -------------------------------------------- */
+function exportCSV(){
+  var t=T();
+  var c=t.th.slice(0,5).join(',')+'\n';
+  rows.forEach(function(r,i){
+    c+=[i+1,r.platform,r.country,'"'+(r.address||r.hint||'').replace(/"/g,'""')+'"',
+        '"'+[r.city,r.region,r.postal].filter(Boolean).join(', ')+'"','"'+(r.url||'')+'"'].join(',')+'\n';
+  });
+  var b=new Blob([c],{type:'text/csv;charset=utf-8'}), u=URL.createObjectURL(b);
+  var a=document.createElement('a'); a.href=u;
+  a.download='branchef-radar-'+(document.getElementById('brand').value.trim().replace(/\s+/g,'-')||'brand')+'.csv';
+  a.click(); setTimeout(function(){URL.revokeObjectURL(u);},800);
+}
+function exportPDF(){
+  var t=T(), brand=document.getElementById('brand').value.trim()||'Brand';
+  var doc=new window.jspdf.jsPDF({unit:'pt',format:'a4'});
+  var W=doc.internal.pageSize.getWidth();
+  doc.setFillColor(124,58,237); doc.rect(0,0,W,68,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont(undefined,'bold');
+  doc.text('BranChef — Brand Radar',40,34);
+  doc.setFontSize(11); doc.setFont(undefined,'normal');
+  doc.text(brand+'  ·  '+rows.length+' '+t.k_total.toLowerCase(),40,54);
+  doc.autoTable({
+    startY:88,
+    head:[[t.th[0],t.th[1],t.th[2],t.th[3],t.th[4]]],
+    body:rows.map(function(r,i){
+      return [i+1, r.platform, r.country, (r.address||r.hint||'—'),
+              [r.city,r.region,r.postal].filter(Boolean).join(', ')||'—'];
+    }),
+    styles:{fontSize:8,cellPadding:5},
+    headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[248,247,255]},
+    columnStyles:{0:{cellWidth:28},1:{cellWidth:74},2:{cellWidth:58}}
+  });
+  doc.save('branchef-radar-'+brand.replace(/\s+/g,'-')+'.pdf');
+}
+
+setLang(lang);
+</script>
+</body>
+</html>
