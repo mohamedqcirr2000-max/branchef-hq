@@ -13,6 +13,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root{
   --bg:#08080A; --panel:#101014; --panel-2:#16161C; --line:#22222B; --line-soft:#1A1A22;
@@ -287,6 +290,22 @@ input.srch{background:var(--panel-2);border:1px solid var(--line);color:var(--in
     </div>
   </section>
 
+  <!-- 8 PARTNER REPORTS -->
+  <section class="view" id="v8">
+    <div id="prTotals" class="tot"></div>
+    <div class="card">
+      <div class="card-h">
+        <div><div class="t">Reports for the restaurants</div>
+        <div class="s">One PDF each — balance, every brand, and the tax split. Commission and the tablet fee are never printed.</div></div>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm" onclick="allPdf()">Download all as one PDF</button>
+          <button class="btn primary sm" onclick="sendAllMail()">Send all by email</button>
+        </div>
+      </div>
+      <div class="card-b" id="prList"></div>
+    </div>
+  </section>
+
   <!-- 7 FINANCE -->
   <section class="view" id="v7">
     <div class="card">
@@ -417,6 +436,7 @@ function save(){
       await CFG.set(Object.assign({
         partners:S.partners, defComm:S.defComm, defTab:S.defTab,
         assign:S.assign, ddAssign:S.ddAssign, ambig:S.ambig, refAssign:S.refAssign, ddAddrBook:S.ddAddrBook, ddDir:S.ddDir,
+        pdfOpts:S.pdfOpts||{}, taxRate:S.taxRate||{}, sent:S.sent||{},
         seedVersion:S.seedVersion||SEED_VERSION
       },stamp));                       /* full overwrite — no map merging */
       await WEEK(S.week.a).set(Object.assign({
@@ -467,7 +487,7 @@ fauth.onAuthStateChanged(async user=>{
            take it, and keep the choices you made by hand */
         S.partners=SEED_RESTAURANTS.map(([name,addr])=>{
           const o=(d.partners||[]).find(p=>p.name===name), t=TERMS[name];
-          return {name, addr, email:o?o.email:'',
+          return {name, addr, email:(o&&o.email)||SEED_EMAIL[name]||'',
                   comm:   t ? t.comm   : (o?o.comm:''),
                   tablet: t ? t.tablet : (o && o.tablet!==0 ? o.tablet : '')};
         });
@@ -521,7 +541,110 @@ fauth.onAuthStateChanged(async user=>{
   }
 });
 
-const SEED_VERSION = 12;   /* bump whenever the roster below changes */
+/* ---------- sending the reports ------------------------------ */
+const MAIL = { pubkey:'qsfusV53J4_RjftgA', service:'service_vvqywr7', template:'template_sn0be9k',
+               name:'SALES TEAM™©', phone:'(438) 453-0588', reply:'Salesteam@getbranchef.com' };
+/* addresses carried over from the report sender */
+const SEED_EMAIL = {
+ 'Buffalo Bill Wings Décarie':'hargon2006@gmail.com',
+ 'Buffalo Bill Wings Sainte-Catherine':'hargon2006@gmail.com',
+ 'Buffalo Bill Wings Laval':'hargon2006@gmail.com',
+ 'Buffalo Bill Wings Notre Dame':'hargon2006@gmail.com',
+ 'Buffalo Wings Lasalle':'hargon2006@gmail.com',
+ 'Buffalo Wings Longueuil':'hargon2006@gmail.com',
+ 'Le Rois de Sous Marin':'leroidusousmarin@gmail.com',
+ 'Popular Pizza Winnipeg':'popularpizza1220@gmail.com',
+ 'Popular Pizza Fox Way':'popularpizza5380terryfoxway@gmail.com',
+ 'Pizza Pros':'frmraz6@gmail.com',
+ 'Grabba Pizza Newmarket':'ashsandhu350@gmail.com',
+ 'Mansour Restaurant':'amirahoubi@hotmail.com',
+ 'Popular Pizza Bradford':'popularpizza1313@gmail.com',
+ 'House of Pizza':'houseofpizza1503@gmail.com',
+ 'Original Pizza':'mrsmokenslice@gmail.com',
+ 'Shawarma Style (Mont Bleu)':'astvision7l@hotmail.fr',
+ 'Shawarma Style (Vanier)':'astvision7l@hotmail.fr',
+ 'Pizza St Laurent Ontario':'pizzastlaurent@hotmail.com',
+ 'Pizza St Laurent Valleyfield':'pizzastlaurent@hotmail.com',
+ 'Virginia':'yassinetadghouti@gmail.com',
+ 'Toubkal':'yassinetadghouti@gmail.com',
+ 'Supreme Pizzeria (Halal)':'supremepizzadonald@gmail.com',
+ 'La Fiesta':'marounkairouz@icloud.com',
+ 'Pita Nutso Winnipeg':'deep.bhojak8055@gmail.com',
+ 'Maison Des Saveurs Montreal':'maisondessaveursmtl@gmail.com',
+ 'Cozamia':'cozamia.downtown@gmail.com',
+ 'Flamme Up':'flammeuppouletco@gmail.com',
+ 'Double Stack Montreal':'amine_1980@live.com',
+ 'Pizza Bell Jaspir':'jassi1807@hotmail.com',
+ 'Baldam':'abdmohamed7645@gmail.com',
+ 'Fuzionel':'fuzionel.canada@gmail.com',
+ 'Bramato Poulet & Burger':'info@bramato.ca'
+};
+function partnerEmail(name){
+  const p=S.partners.find(x=>x.name===name);
+  return (p&&p.email&&p.email.trim()) ? p.email.trim() : (SEED_EMAIL[name]||'');
+}
+
+/* EmailJS takes the PDF as a real file on a hidden form */
+async function mailOne(r){
+  const to=partnerEmail(r.name);
+  if(!to) throw new Error('no email address');
+  const form=document.createElement('form'); form.style.display='none';
+  document.body.appendChild(form);
+  const params={
+    to_email:to, to_name:stripEmoji(r.name).toUpperCase(),
+    week_label:(S.week.a||'')+' – '+(S.week.b||''),
+    balance:money(r.net), net_payout:money(r.net),
+    uber_amount:money(r.ut), dd_amount:money(r.dt), gross_amount:money(r.gross),
+    commission_rate:r.comm+'%',
+    from_name:MAIL.name, sender_name:MAIL.name, sender_phone:MAIL.phone,
+    reply_to:MAIL.reply
+  };
+  Object.keys(params).forEach(k=>{
+    const i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=params[k];
+    form.appendChild(i);
+  });
+  const fi=document.createElement('input'); fi.type='file'; fi.name='attachment_data';
+  form.appendChild(fi);
+  const blob=partnerDoc(r).output('blob');
+  const dt=new DataTransfer();
+  dt.items.add(new File([blob], pdfName(r), {type:'application/pdf'}));
+  fi.files=dt.files;
+  try{ await emailjs.sendForm(MAIL.service, MAIL.template, form, MAIL.pubkey); }
+  finally{ document.body.removeChild(form); }
+}
+
+async function sendOne(i){
+  const r=(window._res||[])[i]; if(!r) return;
+  const to=partnerEmail(r.name);
+  if(!to){ toast('No email for '+r.name+' — add it on the Restaurants tab'); return; }
+  if(!confirm('Send '+money(r.net)+' report to '+r.name+'?\n'+to)) return;
+  toast('Sending to '+r.name+'…');
+  try{ await mailOne(r); markSent(r.name); toast('Sent to '+r.name); }
+  catch(e){ toast('Failed: '+(e.text||e.message||'unknown')); }
+  renderPartnerReports();
+}
+async function sendAllMail(){
+  const paid=(window._res||[]).filter(r=>r.net>0 && partnerEmail(r.name));
+  const skip=(window._res||[]).filter(r=>r.net>0 && !partnerEmail(r.name));
+  if(!paid.length){ toast('No addresses on file yet'); return; }
+  if(!confirm('Send '+paid.length+' reports?'+(skip.length?'\n\n'+skip.length+' have no email and will be skipped:\n'+skip.map(r=>r.name).join(', '):''))) return;
+  let ok=0, bad=[];
+  for(const r of paid){
+    try{ await mailOne(r); markSent(r.name); ok++; toast('Sent '+ok+' of '+paid.length); }
+    catch(e){ bad.push(r.name); }
+    await new Promise(z=>setTimeout(z,1200));   /* stay under the rate limit */
+    renderPartnerReports();
+  }
+  toast(ok+' sent'+(bad.length?' · '+bad.length+' failed':''));
+  if(bad.length) alert('These did not go out:\n'+bad.join('\n'));
+}
+function markSent(name){
+  if(!S.sent) S.sent={};
+  S.sent[(S.week.a||'')+'|'+name]=Date.now(); save();
+}
+const wasSent = name => !!(S.sent&&S.sent[(S.week.a||'')+'|'+name]);
+
+const SEED_VERSION = 14;   /* bump whenever the roster below changes */
 const SEED_RESTAURANTS = [["Welat Pizza Lévis","108B Rte du Président-Kennedy, Lévis, QC G6V 6C9"],["Pizza Pros","20 Lockport Ave, Etobicoke, ON M8Z 2R7"],["Bramato Poulet & Burger","155 Boulevard des Laurentides, Laval, QC H7G 2T5"],["Baldam","40 Milner Rd, Moncton, NB E1E 2R8"],["Fuzionel","361 Rue de Liège E, Montréal, QC H2P 1J6"],["Buffalo Bill Wings Décarie","930 Bd Décarie, Saint-Laurent, QC H4L 3M4"],["Buffalo Bill Wings Sainte-Catherine","914 Rue Sainte-Catherine E, Montréal, QC H2L 2E5"],["Buffalo Bill Wings Laval","4343 Bd Sainte-Rose, Laval, QC H7R 1X6"],["Buffalo Bill Wings Notre Dame","3548 R. Notre Dame O, Montréal, QC H4C 1P4"],["Buffalo Wings Lasalle","620 90e Avenue, LaSalle, QC H8R 3A1"],["Buffalo Wings Longueuil","139 Boulevard Curé-Poirier O, Longueuil, QC J4J 2G2"],["Pizza Hot Wings","3883 Don Mills Rd, North York, ON M2H 2S7"],["Le Rois de Sous Marin","1067 Taschereau Blvd, La Prairie, QC J5R 1W9"],["Popular Pizza Winnipeg","1220 St Mary's Rd, Winnipeg, MB R2M 3V6"],["Popular Pizza Fox Way","5380 Terry Fox Way, Mississauga, ON L5V 0A5"],["Grabba Pizza Newmarket","350 Davis Dr #6, Newmarket, ON L3Y 2N7"],["Mansour Restaurant","969 Av. Cartier, Québec, QC G1R 2S2"],["Pizza Bell","807 Main St W, Hamilton, ON L8S 1A2"],["Pizza Bell Downtown","180 James St S, Hamilton, ON L8P 4V1"],["Pizza Bell Jaspir","96 Centennial Pkwy N, Hamilton, ON L8E 1H7"],["Anubis Pizza","562 Kerr St, Oakville, ON L6K 3C7"],["Popular Pizza Bradford","118 Holland St E Unit 3, Bradford, ON L3Z 2B4"],["Halagourmet Laval","567 Boulevard des Laurentides, Laval, QC H7G 2V6"],["Cairo Shawarma","75 Dundas St W, Mississauga, ON L5B 1H7"],["El Sarjinos Pizzeria","1105 Cobden Rd, Ottawa, ON K2C 2Z1"],["House of Pizza","1574 Walkley Rd, Ottawa, ON K2P 2P5"],["Original Pizza","5518 Sherbrooke St W, Montreal, QC H4A 1W2"],["Rosabella Pizza","2895 Bank St, Gloucester, ON K1T 3M7"],["Pizza Les Freres","784 Bd Curé-Labelle #40, Laval, QC H7V 2V3"],["Shawarma Style (Mont Bleu)","207 Bd du Mont-Bleu, Gatineau, QC J8Z 2M3"],["Shawarma Style (Vanier)","571 Chem. Vanier #105, Gatineau, QC J9J 4L3"],["Pizza St Laurent Ontario","24 Ontario St E, Montreal, QC H2X 3W2"],["Pizza St Laurent Valleyfield","118 Rue du Marché, Salaberry-de-Valleyfield, QC J6T 1P9"],["Virginia","2474 Rue Sauvé E, Montréal, QC H2B 1B9"],["Toubkal","671 B Rue Notre-Dame, Repentigny, QC J6A 2W5"],["Batbout","2490 Rue Bélanger, Montréal, QC H2G 2C8"],["Supreme Pizzeria (Halal)","425 Donald St, Ottawa, ON K1K 3M7"],["Amira Restaurant Granby","344 Rue Principale, Granby, QC J2G 2W4"],["La Fiesta","630 Boulevard Maloney E, Gatineau, QC J8P 7M4"],["Pita Nutso Winnipeg","305 McPhillips St Unite 500, Winnipeg, MB R3E 3H9"],["Maison Des Saveurs Montreal","3592 Rue Bélair, Montréal, QC H2A 2B2"],["Cozamia","32 Byward Market Square, Ottawa, ON K1N 9C3"],["Flamme Up","107 Queen St, Sherbrooke, QC J1M 1J7"],["Double Stack Montreal","1429 A R. Bishop, Montréal, QC H3G 2E4"],["Grab a Pizza Orange Ville","50 Rolling Hills Dr, Orangeville, ON L9W 4W2"]];   /* [name, address] */
 const SEED_ASSIGN = {"1f9c1715-8997-5792-91e8-bf0b8eed8301":"El Sarjinos Pizzeria","17d17638-1207-5701-a634-ab01f461cf95":"Buffalo Bill Wings Laval","33028fd5-6467-5695-af60-9f69d0997704":"Buffalo Bill Wings Laval","264a44d2-024e-5cef-8f43-81e1500dc4d2":"Pita Nutso Winnipeg","2ab2835f-61c4-55a2-b933-86a749666708":"House of Pizza","4b43e36f-5da5-5293-bbba-2926395a29c2":"Buffalo Bill Wings Sainte-Catherine","3e79c623-3b58-569b-9f6a-c8163273b3f5":"Virginia","2eb92425-5d7b-503e-8c1a-92f00e97ddb0":"Toubkal","48347142-0872-58a0-a3c5-b12cea0ca7da":"Original Pizza","443108bd-6826-5dbe-af8a-e735d803d96e":"El Sarjinos Pizzeria","0cb47ee2-6b0a-565c-9946-2481a83a6f48":"Popular Pizza Bradford","2b720e32-daee-5134-b586-5eff0c4863ac":"Anubis Pizza","1fbfc551-5b91-5d2a-8458-23af722c24cc":"Grab a Pizza Orange Ville","51219a62-d87c-5bea-82ba-67f7b99a842d":"Batbout","118623e8-55f1-5bc4-ab33-778ebef5b0d8":"Halagourmet Laval","3da45885-9e25-54d1-b329-09c8db7ceb9c":"El Sarjinos Pizzeria","41dcef98-8e37-542d-bede-e95250bb2930":"Cairo Shawarma","45b8a71d-acf3-530c-9b72-70fa72c00f48":"Virginia","024ee564-529a-526a-bc06-74c0c6613567":"Le Rois de Sous Marin","4a57413c-01bf-5a99-94bb-36f66ae9c741":"Cozamia","53ec4f8b-a1cc-563f-96b8-d7935a52c3e4":"Virginia","3c2566b5-feda-50df-8ac1-e852821d7ece":"Mansour Restaurant","4fd563cb-6f8d-5273-81f5-49ff3ef06e99":"Virginia","3c51c847-bd53-5b39-9da9-466d8e566b1c":"House of Pizza","04d97589-d82e-5edc-8337-7136b7f2035c":"Virginia","3ffc0ab3-dc30-55ae-8d89-54a941d04205":"Popular Pizza Fox Way","3f97a0f4-0ba9-51e1-a872-b0d5a6f1b742":"Pizza Bell Jaspir","1e3c5b9e-cb07-529e-abe3-fa85c81ee4fb":"Toubkal","413631ba-0298-5ef6-a4ca-684e24c1d8c1":"Pizza St Laurent Ontario","34ad380e-a3da-5e22-9848-f4e30a52cfcc":"Toubkal","41f2abda-528b-5b35-9160-bed39b6723a3":"Virginia","12f1b434-b8a2-50da-b25b-5e9931b9661b":"Pizza Les Freres","194fca4a-d4a3-58d3-a3a7-d81b0bb1daed":"Rosabella Pizza","3d4f8288-911a-5740-861c-38179260f54b":"Mansour Restaurant","4884447f-2d5c-5ae8-a89f-ddccae3c732c":"El Sarjinos Pizzeria","2fb26388-294b-534f-ad5a-009dc9e15cbd":"Popular Pizza Fox Way","07bde2f9-471f-5568-b8d9-48e4e8d2b28a":"La Fiesta","48eadb39-c9c5-572a-a263-d673c55dd999":"Popular Pizza Winnipeg","2a029a5a-4e1b-5485-ab60-c28916b31eec":"Virginia","481390d8-e894-5af5-a5d5-de8eea6df7b2":"Shawarma Style (Vanier)","355043e1-14fc-5cb7-ba93-87b9913968d4":"Rosabella Pizza","1f9a6e47-97cc-5913-9adb-470365342401":"Mansour Restaurant","438a76ed-0be1-500a-836d-a020d653c1df":"Shawarma Style (Mont Bleu)","363e3c52-2fd3-5bd0-8039-ca9a37172186":"House of Pizza","10278649-ca75-59fe-a83f-aeb84dc47b4a":"Shawarma Style (Vanier)","0d38c764-48e6-5003-85c3-d687b1434408":"Pizza Bell Jaspir","4fca0464-3d05-5e5b-ae71-81313a5a3bb3":"Pizza Hot Wings","2bb6e56b-be44-574c-84dd-082e3536cbf1":"Pizza Pros","49ec8d6a-c084-54c4-b687-5ca3899e211c":"Popular Pizza Winnipeg","43960d11-e7ee-575d-9c92-50b858b7f12b":"Buffalo Bill Wings Décarie","1d025d5c-0b1a-5a2a-a59e-90c72db39fca":"Virginia","20a14865-cf44-5d7b-ab6f-7f56785ebf56":"Halagourmet Laval","292ef79a-8cf4-5ba2-9426-609011e7c63b":"Anubis Pizza","058f871f-3bb1-5019-94fb-ca6470cb6427":"El Sarjinos Pizzeria","1cdca739-3546-5fdf-afc7-30104c9eb545":"Popular Pizza Bradford","28bebb70-9573-52fd-92dd-71cf757ed1b2":"Popular Pizza Winnipeg","51172ff8-3ee4-5034-bb67-70f96b5df99a":"Virginia","1d5c566a-434d-5e5e-9f24-9e34e328618a":"Toubkal","4b6d2b32-026c-51bf-baf7-c055e89ec451":"Virginia","07907dba-4177-58bb-9835-0f56b584d22a":"Pizza Les Freres","1975f78b-6eac-5312-a4ac-e0061cef5881":"Buffalo Wings Longueuil","33aba675-892f-5bc2-8d7d-4a5866b30298":"Buffalo Bill Wings Laval","1cdfdcec-fc0e-5fe2-895d-55e45d60ccb4":"Buffalo Bill Wings Sainte-Catherine","36dbe741-91ed-5786-9e5f-3f5352b77183":"Cairo Shawarma","34687955-561e-5a0f-9d88-f1ca968ceedd":"Popular Pizza Fox Way","51889be9-6ea3-5cee-90ba-7509f6b00f8b":"House of Pizza","2ada438d-402a-5bcc-ab62-e4d1a96cda6a":"House of Pizza","34b67830-5d9d-5360-af70-88fad4ea57a9":"Pizza Pros","52c9a1a0-114c-53d0-9945-ddeb07649274":"House of Pizza","352bca4c-696c-5fef-8137-6bc1f4d81a2a":"Virginia","07bcdb4b-df65-5bdb-b97d-5eead8b9e6e8":"Virginia","3c70532e-2070-5fae-af73-3ceaeae23a43":"Baldam","34619ab2-1fc2-5d11-835c-bdf642ea63c7":"Virginia","2204d926-fa1d-5f51-80ce-e40e1ecb63ef":"Batbout","074a1bc6-98ef-5365-9f33-339b4101f97d":"Mansour Restaurant","516cceb2-1842-55fe-8a09-fa63cee024c5":"Rosabella Pizza","4c743b86-203a-5412-a018-00d457d41bb6":"Fuzionel","4f00f957-385a-56a3-ab05-f0baa12d3a77":"House of Pizza","00a03032-2dad-5574-91e0-f9fb6062e08a":"Buffalo Bill Wings Notre Dame","1bc7cf89-c3f5-53b0-9095-325852ee5f79":"Buffalo Bill Wings Sainte-Catherine","493a6df2-18f2-5d71-8c4d-78f000a2b20a":"Halagourmet Laval","0bbc0baa-412b-5d95-974b-6b3452fa272d":"Grab a Pizza Orange Ville","1b6c7f8f-ae95-55c5-be80-294ddf68ebf6":"Pizza Pros","295ee9e6-3e5b-5e9b-841d-4a7bccad6e62":"Shawarma Style (Vanier)","2ecf9148-3cfc-5f67-94aa-b5693d21e352":"Shawarma Style (Mont Bleu)","2079380d-1125-52be-82ce-415a226464c4":"Pizza St Laurent Ontario","4013e4cd-60c4-55b8-bc0b-cc46b7d6616d":"Mansour Restaurant","08e1b696-3184-53be-976d-110bd86b7f98":"Cairo Shawarma","3b5f4828-25f3-5d75-a1d4-3b3e052b5309":"Popular Pizza Fox Way","028d4588-9968-5f16-b4a8-5dc67eee04b6":"Original Pizza","16d307d4-c2f9-5f26-8da4-e398ccb0ffb2":"Virginia","0695ca5c-54b2-5412-a02e-840e5808b626":"Batbout","0b50a91b-5344-503b-a884-3f4f041457c6":"Pizza Bell Jaspir","40155379-de25-56e1-ba94-2c16607ee9c6":"Buffalo Bill Wings Sainte-Catherine","333f7dd3-2c30-5018-8ce9-bd5fe748d872":"Le Rois de Sous Marin","3ca1b1c8-ec7c-5e78-af69-777bcae337d9":"Cozamia","4a1a6884-ad80-5c87-933e-27f0d5f4ac3a":"Popular Pizza Bradford","03a9a649-a135-5c37-a185-66b83f373470":"Pizza Bell Downtown","2d1e6c50-2edb-5edb-bbc5-71fa466a96c2":"Buffalo Bill Wings Notre Dame","1f27bf9b-4bb7-5ade-b62f-19e34b6355d6":"Popular Pizza Winnipeg","40f884e5-146b-5f3c-84f4-3657db99797b":"Supreme Pizzeria (Halal)","39e6852f-c472-5138-bca1-62590451ad0f":"Popular Pizza Winnipeg","1aa605c2-0e1f-53e4-8877-2855ab8febe2":"Cairo Shawarma","0140d3e1-e35d-539b-bbf2-4e0326238c27":"Rosabella Pizza","405e2a80-f074-546b-b0a2-60e0f6133d64":"Mansour Restaurant","2e23505c-dc7e-5b95-b019-4ea15b58f2f2":"Shawarma Style (Mont Bleu)","21993694-6bfb-58f7-bc63-0d4fb3238e5c":"House of Pizza","42082b45-de14-5f69-9082-18f96acd3658":"Shawarma Style (Vanier)","2f03cff9-33ae-51b1-bb3f-51028fab5b22":"Toubkal","03c0f851-9e4e-5a2f-811b-4ef86af95755":"Cozamia","4f183315-952e-5509-b2a5-b288d79ac1b8":"Pizza Les Freres","4c07f21d-1961-5a3e-b580-52cb2f659b90":"Pizza St Laurent Ontario","34d38884-7e2d-5c98-ba1a-bffa901d6cdd":"Pizza St Laurent Valleyfield","1ae3cd7b-cde5-55b1-aeb0-df4fa459b482":"Popular Pizza Winnipeg","012209dd-4fc8-5b57-97d3-98cfb9792a25":"Double Stack Montreal","0bcfcbd6-33d6-5d65-8bec-1c8980810091":"Buffalo Bill Wings Laval","28a7ea9e-4077-515d-b9a6-6ddd7e00441f":"Mansour Restaurant","0fbd2526-550f-5f9c-a2c4-431748e8c419":"Popular Pizza Fox Way","06edb477-7485-5f6d-b568-dba6dd2f2b37":"Welat Pizza Lévis","2e401e23-8b73-571a-905f-a3249ab301e7":"Buffalo Bill Wings Sainte-Catherine","29803735-56df-5794-99a8-d654f02a9beb":"Cozamia","46245e9b-7094-50ed-89a7-59db62df0939":"La Fiesta","52927271-9910-548c-89ab-a0dd96d4c561":"Popular Pizza Fox Way","0f834ca9-1d3c-53a2-a867-cfe867895f69":"Buffalo Bill Wings Notre Dame","0ef35531-5025-55dd-8226-e66f6e1da147":"Buffalo Bill Wings Sainte-Catherine","2a174179-41d4-5f35-9d44-96186929eb8e":"Mansour Restaurant","06440216-624c-50f7-ac4b-fb52d7812d1a":"Virginia","28018a80-71b3-580d-906c-eb411c1d56f6":"Mansour Restaurant","4f64ed7f-618d-57e8-9572-09ff844e1261":"House of Pizza","513e67e5-5b8c-5248-a9f0-6fc87d6584ce":"House of Pizza","4d77c61c-1c6a-5169-ba3d-3373bd5a5d1e":"Virginia","12a56b50-b58b-506c-aba7-1e4b50559b58":"Buffalo Bill Wings Laval","49f193d7-3c4c-5954-8e15-84cc6a8c3053":"Toubkal","25e0b3d6-dee6-5574-b42b-c78b2aedb67e":"Toubkal","5748d188-73ca-5f19-bf40-db82774eed7f":"Pizza Bell Jaspir","8e317721-2e97-55ed-8dc8-ec4505f21e90":"Virginia","61135c40-f98e-5493-9f96-2e4c5058e620":"Baldam","84e28080-5c04-5ab3-8dbb-a241b760418c":"Double Stack Montreal","55eaa8a6-aca4-5b4b-a21d-c3c9b773bb12":"Buffalo Bill Wings Sainte-Catherine","60d2b149-8a40-5e07-b1bc-6588452edcd0":"Anubis Pizza","9cc12736-2e87-5c4a-b0e3-b38fdf641c80":"Popular Pizza Winnipeg","735322d7-1b56-5c67-a311-9500596ff9f1":"Original Pizza","9f01a5f4-73f7-5499-9672-b6b1bf032497":"Halagourmet Laval","8d5c7e20-41ee-50f5-baa4-e4ab7ec72247":"Buffalo Wings Longueuil","590f190d-859a-529d-8b22-802f4c63be57":"Grab a Pizza Orange Ville","6154719f-f1f2-5597-8ed7-830d1b7afdcc":"Cairo Shawarma","a4e4f122-e789-5466-a18a-7c8b011e52fb":"House of Pizza","792d3393-7e43-5974-9db2-f3c737ecde9e":"Halagourmet Laval","7208db17-0b86-553f-a513-1083371a36b4":"Virginia","8f296c09-48d9-5ab1-927b-942bde4b2a09":"Pizza St Laurent Ontario","82ed11bb-ed05-54f1-bfb3-194bb0afba6a":"Maison Des Saveurs Montreal","99fd2609-b8a0-5a73-ab4e-cd68f029f06f":"Bramato Poulet & Burger","796bd382-26fd-5ccf-909d-3ed899eefec0":"Buffalo Bill Wings Laval","6c995b51-9af6-5e6b-a1f3-5f7f54136e73":"Buffalo Bill Wings Notre Dame","6ed14dfd-7491-508a-9aa4-47bd7da2053a":"Flamme Up","81897d69-6fd9-5e89-8f0c-560c4c4b2405":"Pizza St Laurent Valleyfield","7e382a68-d190-567e-b10a-f839b245486b":"Shawarma Style (Mont Bleu)","68363735-d35e-5278-8558-ae65efc360e5":"Buffalo Bill Wings Sainte-Catherine","7499513a-ef94-5743-9f92-693547a153f9":"Popular Pizza Winnipeg","a2aadd96-f98c-52a0-be98-32a3452c5a91":"Pizza Les Freres","8ef04c37-f102-5cf4-8a44-977a6d3e8cbd":"El Sarjinos Pizzeria","a4e32992-0ef9-50a2-8041-8bdbb5a407d6":"Shawarma Style (Vanier)","67754f55-072d-5dbf-b29d-4b93edc44a4f":"Halagourmet Laval","87578767-89dd-51db-932f-e241d28ca560":"House of Pizza","8ab93ab0-40bc-5180-a5bb-4fc3de8886e0":"Toubkal","a6a43e19-43c4-5ed5-bf18-469c7c1d3cee":"Halagourmet Laval","68c6aa6e-5742-577e-905c-9cad7549a7df":"Toubkal","7f1402f1-9b11-5f5b-aeb2-7ddfb482cf57":"Pizza Bell","8584702d-c24c-5e0b-b8b3-72c8af410ba2":"Popular Pizza Fox Way","9048e450-2f49-58bd-944e-83d084d8e4a4":"Toubkal","a1495bc9-1858-5784-ae10-080033c1d3d7":"Virginia","59f2049c-c82e-54a2-970b-e352f7e14c3e":"Original Pizza","a7ebbc3b-7715-54d4-9180-6f76d694b270":"Bramato Poulet & Burger","8c1eb2df-6874-54a9-b628-7b4ee07de55a":"Buffalo Wings Lasalle","8a72d479-efa0-5e5e-ad03-a30d3fa1ba06":"Maison Des Saveurs Montreal","99ac9c17-f7af-56fb-9388-90b9110af3bf":"Pizza Hot Wings","7ae1b1a8-339e-55fa-b548-d5d712859b58":"Cairo Shawarma","89d6a0db-ddb9-5530-90e4-95b472ffb022":"Buffalo Wings Longueuil","650a2e38-e710-5138-9704-4c1ba208aa8d":"Original Pizza","8aa0dc53-5538-5f50-9339-ae78abbc502d":"Virginia","6a860f56-9087-5069-bc0e-01a72f111a53":"Toubkal","8b22e21a-1bd2-5877-b96e-a8ade79d3919":"Flamme Up","a694d1c0-201f-5f2d-b370-5d4c3d51e473":"Virginia","6e2984d6-91a0-56be-8e5e-4338a7045745":"House of Pizza","9a5672b5-f5a3-5823-8509-fbbfe2e32f58":"Buffalo Wings Lasalle","acfcd7c9-7c45-5c11-b56c-474535ee6920":"Virginia","6ed69c2f-3cd1-54b7-98ea-0176bbb105ed":"Rosabella Pizza","6da679c9-812e-5039-ae49-7a877cc6e582":"Buffalo Bill Wings Décarie","95361c70-bcf5-5e07-b56d-989cfb31cebe":"Pizza Les Freres","7a8099ba-30f8-5c2c-8cc8-850e00f1545b":"Popular Pizza Fox Way","a13627fc-e131-508e-9d15-e1e26a09d482":"Toubkal","88d4c97b-b511-5138-b18d-ba9b5cb0b6c1":"Pita Nutso Winnipeg","6a25f840-8140-5752-9a34-32502b5ab9cc":"Virginia","5bcc313e-5657-5d7b-97a7-002444d4a9de":"Buffalo Bill Wings Sainte-Catherine","7f279381-c3f3-5fdc-85af-d4c28b26737e":"Shawarma Style (Mont Bleu)","91ad7262-f2c6-5e36-b849-8562b38241d7":"Pizza St Laurent Ontario","6b540e7b-8191-50aa-83e0-60bf0823f68e":"Supreme Pizzeria (Halal)","a0155887-0bd2-5420-a714-381bf0c0f3b5":"Original Pizza","6f7203a4-b911-56d3-9144-eb7716a34fb6":"House of Pizza","6dc6cecd-300b-56fd-9293-ddddfab22635":"Cairo Shawarma","6912847e-32cd-5216-aa8c-048593e12520":"Virginia","889ba7f2-af72-5ec0-a6b2-14909c4cd977":"Amira Restaurant Granby","99b5fad2-fb04-5c90-b92c-60ffe59f0abc":"Shawarma Style (Mont Bleu)","812d7683-5d92-531c-9b20-9bafaf40ff7f":"Buffalo Bill Wings Décarie","78288083-3f88-5bf8-9ad1-61e5a0732b1c":"Buffalo Bill Wings Notre Dame","605923ae-d896-5c39-8eb0-d86cff060a41":"Grab a Pizza Orange Ville","688b7b4c-5322-5138-8d90-db63c0e74615":"Popular Pizza Bradford","a2334520-bbdd-57c7-8e99-bdd667699d34":"House of Pizza","6a44d66c-61fb-5732-84c6-266476e3d611":"Popular Pizza Bradford","a3c11719-afcb-5579-8201-eb2e2c4d3b13":"Shawarma Style (Vanier)","6bd502f4-af13-5b54-a75f-c4ff8b1112a9":"Maison Des Saveurs Montreal","60c93c11-31e2-5a4f-b2e8-68732a1e7861":"Cairo Shawarma","88452e7c-7283-5c14-9f55-b17458ea4398":"Anubis Pizza","578f3991-6378-5aaf-bd15-59cf5aa274cf":"Pizza Hot Wings","6b7a7b69-7c6f-519d-8ddc-3da06067b354":"Halagourmet Laval","5795a957-7023-5932-a003-a7a63801990d":"House of Pizza","a37bf8f9-8cef-55d2-bfd8-4c0edf521634":"Toubkal","8c1fc9cb-e769-55f4-93d1-741b28971b2b":"House of Pizza","85ec4816-646c-5f11-a822-7928fcddb745":"Original Pizza","8662b972-86ee-5ffb-b5be-49bc2ea954b4":"Original Pizza","9e7cf490-23f3-5ce3-b179-93fe717109ec":"Shawarma Style (Vanier)","71ef275b-2b51-5497-bebb-6331c1917161":"Halagourmet Laval","82ac1433-5a01-5ac2-9cfa-51d82d326310":"El Sarjinos Pizzeria","9dc87634-b8b6-5b88-aeb6-ae2c8166da1e":"Buffalo Wings Lasalle","63ae497a-6d96-56dc-b1f5-e737e34e6037":"El Sarjinos Pizzeria","7d664d4a-6176-511f-be4f-eb7e2a89b0bb":"Buffalo Bill Wings Décarie","760ab2e8-4501-5629-ac89-5a674ba3b234":"Supreme Pizzeria (Halal)","835d6b0c-5583-5203-9600-699e284fafd2":"Le Rois de Sous Marin","6a1a18a0-fe23-5e69-87ad-35a44630dcc3":"House of Pizza","aa8f44c2-9449-5b57-bd2c-96d606ec6fc6":"El Sarjinos Pizzeria","5f2ac8d5-997f-5f2a-ae1f-66612819c50f":"Popular Pizza Fox Way","6c2f1912-9621-5a26-842f-b9bc5075fe30":"Supreme Pizzeria (Halal)","ab76db14-552d-51a6-9f48-b5385c96864d":"Welat Pizza Lévis","6aefaa8a-21bb-551d-b577-ecd3715d2be2":"Rosabella Pizza","571115bc-8f8c-56c0-8dd0-97230a79444a":"Welat Pizza Lévis","a28793db-5213-5526-ba9e-7279718a68d3":"Buffalo Wings Lasalle","7e8a319c-7a48-57f0-8712-fba4ee56f6da":"Maison Des Saveurs Montreal","74cb8e14-d56e-593c-90c6-e57e69f29a96":"Popular Pizza Bradford","612f94e3-b7f6-5c30-b7db-1e7b1ce5f5f8":"Buffalo Bill Wings Notre Dame","5a822630-a1bf-594f-b442-d185e4d0ef4f":"Flamme Up","8698af14-5ff9-51c7-bb2d-3139125fe8a7":"Popular Pizza Winnipeg","a9ea1c55-8a16-5419-86dc-80f741c7b6b6":"Maison Des Saveurs Montreal","75d96582-2fc5-505f-ace9-9e25bd16a239":"Batbout","70b0343a-0d67-5a88-ae43-09dd8f278cc2":"Double Stack Montreal","68bcbecf-d5f0-5254-a6d9-9212b58c36f8":"Cairo Shawarma","54633fa6-2372-5e5c-9a49-811ee0321e81":"Pizza Bell","6d36fd8f-b4f9-5840-85c9-2fe62d4031e9":"Popular Pizza Fox Way","95b52aa9-92dc-5884-b234-667f65c5389f":"Grabba Pizza Newmarket","7623c6d8-b136-5799-bd3d-8a9d202a3771":"Anubis Pizza","5c78ff5c-ad22-5e56-bbaf-23f6c263e2c3":"Grab a Pizza Orange Ville","5da1556a-65e9-5eeb-9e9b-ea8979805364":"Pizza St Laurent Valleyfield","a742f32f-0f85-597a-a01a-23c91ab0d034":"El Sarjinos Pizzeria","a4c5a708-1e6e-5908-94a2-c58a25e1f1fa":"Le Rois de Sous Marin","965f09d8-6283-5b40-8708-e432c7201036":"Anubis Pizza","6ff0295f-957e-575e-9c4c-8cc4af4ddf5c":"Mansour Restaurant","9a15f124-56ba-5ef7-93b8-beb14612d2f0":"Shawarma Style (Mont Bleu)","814fc245-ea0a-517a-9fc5-c463d73e3eff":"Buffalo Bill Wings Sainte-Catherine","9eaf76c7-33a2-54ba-b71a-9ef92c664e1b":"Toubkal","5cd49bc0-ad39-5f7b-b4f0-71ed3e91e8ec":"Original Pizza","6ad69ffd-c2bf-565b-a2cf-9bd5a189beff":"Popular Pizza Fox Way","abc11833-70e1-5d82-8cd0-f65ca8f49a5a":"Virginia","8766abef-335c-5b8f-bd6e-ab08f49da44d":"Pizza Les Freres","93579efe-7c3b-5ab4-892e-42986cda6a9d":"Maison Des Saveurs Montreal","56ce2d90-432e-50b4-a14e-dde4aaa4a32c":"El Sarjinos Pizzeria","8b478c06-b232-50df-af70-cdfcb0d20d67":"Mansour Restaurant","58e230e0-7d06-5ffe-9186-54be8bf2aed8":"Baldam","6ded1ce6-15f4-5732-a780-c4a54f0f159d":"Pizza Hot Wings","8d39cb99-6dca-59d9-91ea-c085418f2c1c":"Buffalo Wings Lasalle","9a7c1963-f466-5e06-9b25-96ebfbf96ac5":"Maison Des Saveurs Montreal","8369496a-ab6c-5a75-9b3d-e8767d596f91":"Halagourmet Laval","93828520-395d-5e55-a61b-fb23f322b82a":"El Sarjinos Pizzeria","a76b8441-995f-5fb5-8be8-6e616909b99f":"Buffalo Bill Wings Décarie","958500e4-d86e-570a-9af6-a43f045bc256":"Cairo Shawarma","85cd2222-3014-5afd-89ea-63ef038d4a03":"Buffalo Bill Wings Notre Dame","5f33bd29-231e-5bbf-92e4-056e35aac761":"Toubkal","755143f1-191e-5f4a-9695-0f9758021353":"Original Pizza","a186715a-c2c2-5434-9b4b-da08ffd348b1":"Virginia","5576e310-161b-5ccc-a0fe-5b78c92a46e6":"Le Rois de Sous Marin","662d8356-8aa4-5393-aded-de172a5794c4":"Buffalo Wings Longueuil","5b14e0bf-aa6b-537a-a652-51d5945b21b8":"Buffalo Bill Wings Laval","9333d0cd-39cb-5e54-a4fd-29340eee78fb":"Pizza Hot Wings","8d1494e8-d037-5ced-aa41-9b7d52aebb31":"Original Pizza","706cf133-db75-5b33-a868-3ec14bfed287":"Buffalo Wings Longueuil","6c5108eb-6ecf-5f9b-a0fe-e262ec34a3d3":"Virginia","730877a1-136b-53e4-b94e-18fd4c8eca73":"Maison Des Saveurs Montreal","c67f7919-7453-5ae7-90bf-69f999f5c1a8":"Pizza Bell Downtown","ead3d10f-98ee-57cb-9459-e1c331989d4f":"Pizza Bell","ee0fa61a-9c3e-500b-9b3c-f0fad029a919":"Bramato Poulet & Burger","d66bdd24-cd3e-55c9-8023-5cf7c73c0608":"Popular Pizza Winnipeg","f583a498-26a6-50f0-a229-8376cddb91d4":"Virginia","de646359-e806-59f4-a118-12ce5d0d1a5e":"Shawarma Style (Mont Bleu)","d3754e5d-d9a2-51fb-9c0b-d3ddd91c7a75":"Pizza Bell Downtown","bebf5ff7-f47f-5450-8cc8-658849fbffe0":"Popular Pizza Fox Way","e9453b88-eec3-53a0-ad11-6a4dbe0cf92b":"Grabba Pizza Newmarket","b2de09b5-a6bc-53ba-a5b8-f9dbafce1262":"Pizza Bell","cc67f3fd-6fae-50d4-a814-85d91f18b3ba":"Welat Pizza Lévis","bebc7d29-81ce-5231-af1c-83b547e806b0":"Toubkal","e8c8c844-4eaf-55d8-aea5-d06b0bbd2d59":"Mansour Restaurant","c5d8d048-5445-5cfd-b232-c5ad18424000":"Le Rois de Sous Marin","fc2225ca-ac06-50a5-acf9-14bfdbee8546":"Pizza Hot Wings","d3d13510-2de6-52ca-be47-22539664525a":"Toubkal","fba28f66-3fbd-5d83-8eca-504af872dce8":"Buffalo Wings Lasalle","f7e8bc5d-b0a7-575f-a4b8-88a4bac7a205":"Rosabella Pizza","b089d915-6e7b-5838-bd02-4865678260eb":"Buffalo Bill Wings Décarie","ccad09ed-b39a-5670-9bc9-df1adf4c062f":"Grabba Pizza Newmarket","c5dd347c-0145-5589-b90b-58a066772cb3":"Original Pizza","dcd68206-b0ed-5ea8-8330-3d2903a2a004":"Shawarma Style (Vanier)","d459fdd9-2298-5eae-8633-2ad50f4c6611":"Buffalo Wings Longueuil","e5c42fbd-b5bd-56f1-9f38-2338e3c92b94":"Mansour Restaurant","c0593970-aae3-5be3-bf2f-ebfd25db3ab6":"Maison Des Saveurs Montreal","b6a9125e-364e-4dcd-a50e-e9ddc17df041":"Mansour Restaurant","bb0a9da7-9604-5425-b100-16f1dd4e225d":"House of Pizza","d689d490-876a-5668-922e-7e06dee05e53":"Grabba Pizza Newmarket","bb93f10b-e635-5cfb-8dfa-88bee43706ea":"Virginia","f0a7ed2a-3107-5c79-8f47-471759ad7f34":"Shawarma Style (Vanier)","bce01d4d-497e-5e9c-a564-6b6b64455095":"Flamme Up","b93642df-dc83-53cf-a29b-6a05e384a553":"Shawarma Style (Mont Bleu)","b55ec37f-7bb7-59b4-bdfa-7a7423dbb89e":"Bramato Poulet & Burger","e54091b0-9d03-589c-bfaf-92ebd6113f13":"La Fiesta","f0593816-b0ae-5358-ad4a-c243eaf848e1":"Pizza St Laurent Valleyfield","e0e9b4cd-55dd-589a-acd8-bca855cec40d":"Pizza Bell","fe9a5307-ef57-5714-97fa-df52c8c4e765":"Grabba Pizza Newmarket","b2da2757-bec2-52e8-9e71-9cd4acc86a7e":"Buffalo Bill Wings Notre Dame","da9c9d22-56a3-5aa3-8530-34d483ef4247":"Welat Pizza Lévis","af1c0b32-cc00-5b9e-8494-6333e98a118d":"Original Pizza","b28db49d-76ea-5d67-b11d-8ed48b15613a":"Buffalo Bill Wings Notre Dame","caa80ef2-ea32-5818-a243-5af99a55f943":"Original Pizza","ee00f4ab-fd42-5a4b-8072-c798e9c851d6":"Cairo Shawarma","b254590a-db01-5135-a748-c2311fa6ea6f":"Pizza Pros","e4e1cd4d-c03d-5626-a4aa-72e201ea04c9":"Toubkal","b12f115c-0792-5693-bc38-70063135fafa":"Pizza Bell Downtown","eb2bc447-b21b-5ea3-bcd7-550651504e12":"Bramato Poulet & Burger","fa7e151d-803a-5a72-a09f-9fec2770a076":"Grabba Pizza Newmarket","c6414ed5-3b4c-5942-9f40-7e3ec9a6e762":"Toubkal","c84111fd-602f-5633-bb57-f4a87b107c4f":"Virginia","bd3d9ded-c532-57d4-86d1-878289fe28b6":"Buffalo Wings Longueuil","e6a0fd63-0e74-5f4d-9b6a-435c0d33273a":"Original Pizza","f4bf726f-4b79-5532-8910-eb08f1407fa2":"La Fiesta","cb83ddec-e8b9-5dac-87c7-8ec5c9031d35":"Fuzionel","bf043d0b-2fb9-56b3-832c-114ddbff2686":"Toubkal","c1c47764-7725-5afe-9edb-90eab124c86f":"Amira Restaurant Granby","d411efd9-66fd-5e04-ad9c-b0217a2e65a6":"Mansour Restaurant","f0b53703-fcb3-5a9a-8ef9-8273eb0dee75":"Pizza Bell","bee73715-746a-54ea-87b6-d3c2319dee09":"Toubkal","df45b968-eb0f-5470-897e-352c99f44fb7":"Toubkal","d6590769-b719-524d-9ec1-1fb7347bd690":"Mansour Restaurant","dc6e8100-615e-57c4-b3fb-62650d97f730":"Amira Restaurant Granby","afb1a93f-3004-545b-be99-e57126b05f98":"Toubkal","c91995e4-7727-5a9f-af16-8f1467e3882b":"Maison Des Saveurs Montreal","ae75464d-595b-5538-9804-48d43e243c1b":"Pizza Pros","ceebfa7b-5cd7-55d3-9b6a-2499746bdb94":"Bramato Poulet & Burger","f7500235-3788-5571-8375-946e852b5fca":"Le Rois de Sous Marin","d3a5dac6-6131-5792-a381-1929ba723c6c":"El Sarjinos Pizzeria","fb143fd6-4c20-559f-9955-4b6c6ddcfea5":"Popular Pizza Winnipeg","bd7db3c1-0c95-5f19-b8b9-a2a882e15144":"Pizza Les Freres","d073146c-1076-5493-ba5a-0b308ccdf021":"Amira Restaurant Granby","e896194c-6aa0-5de8-99ba-6bc73845a97d":"Pizza Hot Wings","bd66a774-0266-53fa-91bd-74f9b3fe9bce":"Toubkal","de34961d-5edc-5380-907b-6224165038a6":"Pizza Bell Downtown","f558ad60-0620-54e9-bf11-c86ad11b7f97":"Pizza St Laurent Valleyfield","df028f3d-5171-5503-8e9d-ca0670f54869":"Bramato Poulet & Burger","b8f17831-ce4f-551f-89fa-5682eb651086":"El Sarjinos Pizzeria","b7e43bc5-9c8b-5ba3-99d4-4d1ee96e55dc":"Buffalo Bill Wings Décarie","fd609a77-7318-593f-a0a4-ddc328298aad":"Le Rois de Sous Marin","dab29d79-a7ac-5c8c-9abf-ee59d7d817c4":"Buffalo Wings Lasalle","af9504c3-e291-5c5b-ae33-c20f65e40e39":"Bramato Poulet & Burger","e77d7beb-b838-5b40-b1c5-f348dfee6efa":"Mansour Restaurant","ea19a2e7-0c14-51cd-8026-98cb04a19a33":"El Sarjinos Pizzeria","c282a82c-87ff-51c9-bc9e-df8809e6b71d":"Buffalo Bill Wings Décarie","beaeaa1f-5ff0-5b74-8222-2c877b9ec72f":"Shawarma Style (Mont Bleu)","ccd5cc5d-62ca-56db-9704-08e56311c7e4":"Buffalo Wings Longueuil","cee3befc-874f-5ea9-9d43-f28f4e2ae5f8":"La Fiesta","f2c9340c-961f-554b-aeb5-131d9bb2d0aa":"Pizza St Laurent Ontario","e8e4bb1f-9e8e-527e-9fa8-b06e78aeedad":"Welat Pizza Lévis","bf9b2e0c-e765-57b4-9afb-5259163d3588":"Buffalo Bill Wings Laval","bff15a3e-3112-518a-8071-45caec3b60be":"Pita Nutso Winnipeg","b5235cf0-ef66-5736-883f-637299e76373":"La Fiesta","bc8c61c5-6722-54b3-9b8b-16db8064092e":"Virginia","dd96e2d8-3ec2-5283-a049-2ed36978e6f4":"Amira Restaurant Granby","e4ead949-03cc-5037-b2b7-dfe66c929cd6":"Pita Nutso Winnipeg","e881d5b4-5494-502f-8fca-fb9bd370016c":"Grabba Pizza Newmarket","e9c4fcfe-a2cf-5d35-a69c-1b06246b5361":"Bramato Poulet & Burger","b9c1d119-f955-5561-9973-87f674d776aa":"La Fiesta","e48d468c-f6b2-5b03-bd40-b5680003c5c8":"Flamme Up","bd45386c-bbe7-5e09-8103-6dcebee77bac":"Virginia","ee6bbd4b-c300-5d4b-a21f-c19be287cabc":"Le Rois de Sous Marin","c6469543-e1c4-59e0-a3db-d957e4256b0b":"Rosabella Pizza","ae586e06-be24-5e66-91c0-71ec4fbef9e7":"Bramato Poulet & Burger","f64db9b4-1320-5be5-90c1-1e4ddd596840":"Original Pizza","c4bb6ca1-fec9-5e5e-a935-0fd7c1bb6439":"Shawarma Style (Vanier)","ad8e16e0-3443-5c30-b120-5d43d5f48ec0":"Shawarma Style (Vanier)","b0da1582-1f2b-5600-810b-66eb36f2f792":"Buffalo Wings Longueuil","c8545ccd-3b60-5466-96a0-0647f66d05be":"Rosabella Pizza","c14384cb-30fd-5941-a2be-4334a344f1ed":"Bramato Poulet & Burger","e8d3aae4-3b64-50fe-8637-8b3ae539a402":"Flamme Up","e8f6ab10-7709-59c1-97ca-2c3ccbc7985d":"Buffalo Bill Wings Décarie","f84dfa69-3d18-55d6-8d79-5e83c2f9ade6":"Pizza Les Freres","fbe0df58-30ad-5356-beb8-5fb71b2ce896":"Le Rois de Sous Marin","d6a830a9-eb3a-5437-9366-1fd11f0bbbe8":"House of Pizza","d4af20cb-6a3b-5d0f-8daf-7a52739715a0":"Virginia"};
 /* DoorDash store IDs are permanent — these come from your Sales-by-order exports */
@@ -532,7 +655,7 @@ const DD_ADDR = {"40808401":"571 Ch Vanier, Gatineau, QC J9J 4L3, Canada","40810
 const TERMS = { 'Virginia':{comm:13,tablet:50}, 'Toubkal':{comm:13,tablet:50} };
 const freshState = () => ({
   partners: SEED_RESTAURANTS.map(([name,addr])=>({
-    name, addr, email:'',
+    name, addr, email: SEED_EMAIL[name]||'',
     comm:   TERMS[name] ? TERMS[name].comm   : '',
     tablet: TERMS[name] ? TERMS[name].tablet : ''
   })),
@@ -544,7 +667,7 @@ const freshState = () => ({
 
 const saved = store.get('bc2', null);
 let S = saved ? saved : freshState();
-['assign','ddAssign','ambig','over','ddDir','refAssign','ddAddrBook','refundNote'].forEach(k=>{ if(!S[k]) S[k]={}; });
+['assign','ddAssign','ambig','over','ddDir','refAssign','ddAddrBook','refundNote','pdfOpts','taxRate','sent'].forEach(k=>{ if(!S[k]) S[k]={}; });
 /* drop links to restaurants that are no longer on the roster */
 function pruneAssign(){
   const live=new Set(S.partners.map(p=>p.name));
@@ -1279,6 +1402,329 @@ function dlCsv(){
   dl('branchef-'+(S.week.a||'week')+'.csv',c,'text/csv;charset=utf-8');
 }
 
+const LOGO_REPORT_B64 = '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';
+
+/* ══════════════════════════════════════════════════════════════
+   Partner reports — the PDF each restaurant receives.
+   Same layout as the report you already send: balance, brands per
+   platform, and the tax split. Commission and tablet fee are never
+   printed; they are folded into one "Commission & fees" line, and
+   only when you tick Payment details for that restaurant.
+   ══════════════════════════════════════════════════════════════ */
+const DEFAULT_TAX_RATE = 14.975;          /* Quebec: GST 5% + QST 9.975% */
+const TAX_BY_PROV = { QC:14.975, ON:13, MB:12, NB:15, NS:15, PE:15, NL:15, BC:12, AB:5, SK:11 };
+
+function partnerTaxRate(name){
+  const o=S.taxRate||{};
+  if(o[name]!=null && o[name]!=='') return +o[name];
+  const p=S.partners.find(x=>x.name===name);
+  const m=(p&&p.addr||'').match(/\b(QC|ON|MB|NB|NS|PE|NL|BC|AB|SK)\b/);
+  return m ? TAX_BY_PROV[m[1]] : DEFAULT_TAX_RATE;
+}
+
+/* brand names carry the address and emoji — the partner only needs the brand */
+function cleanBrand(name){
+  let n=String(name||'')
+    .replace(/\s*\([^)]*\)\s*/g,' ')
+    .replace(/\s*\([^)]*$/,' ')
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu,'')
+    .replace(/[\u{2600}-\u{27BF}]/gu,'')
+    .replace(/[\u{FE00}-\u{FE0F}]/gu,'')
+    .replace(/\s+doordash$/i,'')
+    .replace(/\s+/g,' ').trim();
+  let prev;
+  do{ prev=n;
+    n=n.replace(/\s+\d+\s+[A-Za-zÀ-ÿ'.\-]+$/,'').trim();
+    n=n.replace(/\s+\d[\w'.\-]*$/,'').trim();
+    n=n.replace(/\s*[,:]\s*$/,'').trim();
+  } while(n!==prev);
+  return n || String(name||'').trim();
+}
+const stripEmoji = s => String(s||'')
+  .replace(/[\u{1F300}-\u{1FAFF}]/gu,'').replace(/[\u{2600}-\u{27BF}]/gu,'')
+  .replace(/[\u{FE00}-\u{FE0F}]/gu,'').replace(/[^\x00-\xFF]/g,'')
+  .replace(/[ \t]+/g,' ').trim();
+
+function partnerDoc(r, existing){
+  const { jsPDF } = window.jspdf;
+  const doc = existing || new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const netAmt = r.net>0 ? r.net : 0;
+  const netDisplay = money(netAmt);
+  const wl = (S.week.a&&S.week.b) ? S.week.a.replace(/-/g,'/')+' / '+S.week.b.replace(/-/g,'/') : '';
+  const today = new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  const opt = (S.pdfOpts&&S.pdfOpts[r.name]) || {};
+
+  /* header */
+  doc.setFillColor(255,255,255); doc.rect(0,0,210,40,'F');
+  doc.setFillColor(124,58,237); doc.rect(0,0,5,40,'F');
+  try{ doc.addImage('data:image/jpeg;base64,'+LOGO_REPORT_B64,'JPEG',10,4,30,30); }
+  catch(e){ doc.setFillColor(124,58,237); doc.circle(25,20,12,'F'); }
+  doc.setTextColor(26,26,46); doc.setFontSize(17); doc.setFont('helvetica','bold');
+  doc.text('BRANCHEF',46,19);
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(140,130,170);
+  doc.text('Virtual Brand Partner Report',46,27);
+  const subW=doc.getTextWidth('Virtual Brand Partner Report');
+  doc.setFontSize(6); doc.setTextColor(168,160,190);
+  doc.text('· Rapport de paiement',46+subW+2,27);
+  doc.setFontSize(8); doc.setTextColor(120,110,160);
+  doc.text('Week: '+wl,196,19,{align:'right'});
+  doc.text(today,196,27,{align:'right'});
+  doc.setFillColor(124,58,237); doc.rect(0,40,210,1.5,'F');
+
+  /* restaurant banner */
+  doc.setFillColor(248,246,255); doc.rect(0,41.5,210,18,'F');
+  doc.setFillColor(124,58,237); doc.rect(0,41.5,4,18,'F');
+  doc.setTextColor(26,26,46); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text(stripEmoji(r.name).toUpperCase(),12,54);
+
+  /* balance card */
+  const cardY=66;
+  doc.setFillColor(5,150,105); doc.roundedRect(14,cardY,182,28,4,4,'F');
+  doc.setFillColor(4,120,87); doc.roundedRect(14,cardY,182,10,4,4,'F');
+  doc.rect(14,cardY+6,182,4,'F');
+  doc.setTextColor(209,250,229); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('BALANCE IS',20,cardY+8);
+  const balW=doc.getTextWidth('BALANCE IS');
+  doc.setFontSize(6); doc.setFont('helvetica','normal');
+  doc.text('· SOLDE',20+balW+2,cardY+8);
+  doc.setTextColor(255,255,255); doc.setFontSize(24); doc.setFont('helvetica','bold');
+  doc.text(netDisplay,20,cardY+24);
+  doc.setTextColor(209,250,229); doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Week: '+wl,190,cardY+8,{align:'right'});
+
+  let lastY=cardY+38;
+
+  /* order pills, if you typed counts for this restaurant */
+  const oC=String(opt.orders||'').trim(), cC=String(opt.cancelled||'').trim();
+  if(oC||cC){
+    let pillY=cardY+31, pillX=14;
+    const pills=[];
+    if(oC) pills.push({label:'ORDERS  ·  Commandes',val:oC,col:[5,150,105],bg:[230,248,240]});
+    if(cC) pills.push({label:'CANCELLED  ·  Annulees',val:cC,col:[190,24,93],bg:[253,232,242]});
+    pills.forEach(p=>{
+      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      const lw=doc.getTextWidth(p.label);
+      doc.setFont('helvetica','bold');
+      const w=lw+doc.getTextWidth(p.val)+12;
+      doc.setFillColor(p.bg[0],p.bg[1],p.bg[2]); doc.roundedRect(pillX,pillY,w,8,2,2,'F');
+      doc.setFont('helvetica','normal'); doc.setTextColor(110,110,130);
+      doc.text(p.label,pillX+4,pillY+5.4);
+      doc.setFont('helvetica','bold'); doc.setTextColor(p.col[0],p.col[1],p.col[2]);
+      doc.text(p.val,pillX+8+lw,pillY+5.4);
+      pillX+=w+5;
+    });
+    lastY=pillY+15;
+  }
+
+  /* every brand, with the week's deductions spread across them by share of sales
+     so the printed lines always add up to the balance */
+  const items=[];
+  r.uber.forEach(b=>items.push({plat:'uber',name:b.name,gross:b.amount}));
+  if(r.dd.length) r.dd.forEach(b=>items.push({plat:'dd',name:b.name,gross:b.amount}));
+  else if(r.dt>0) items.push({plat:'dd',name:'DoorDash orders',gross:r.dt});
+
+  const totGross=items.reduce((s,i)=>s+i.gross,0);
+  const factor=totGross>0 ? netAmt/totGross : 0;
+  items.forEach(i=>i.net=Math.round(i.gross*factor*100)/100);
+  const drift=Math.round((netAmt-items.reduce((s,i)=>s+i.net,0))*100)/100;
+  if(Math.abs(drift)>=0.005 && items.length){
+    let bi=0; items.forEach((it,k)=>{ if(it.gross>items[bi].gross) bi=k; });
+    items[bi].net=Math.round((items[bi].net+drift)*100)/100;
+  }
+
+  const rowsFor=p=>items.filter(i=>i.plat===p).map(i=>[cleanBrand(i.name),money(i.net)]);
+  function platformTable(title,dot,rows,y){
+    doc.setFillColor(dot[0],dot[1],dot[2]); doc.circle(15.5,y-1.1,1.6,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+    doc.text(title,19,y);
+    doc.autoTable({
+      startY:y+3, head:[['Virtual Brand  ·  Marque','Net']], body:rows,
+      styles:{fontSize:8,cellPadding:2.4},
+      headStyles:{fillColor:[26,26,46],textColor:255,fontStyle:'bold',fontSize:8},
+      columnStyles:{0:{cellWidth:150,halign:'left',textColor:[40,45,60]},
+                    1:{cellWidth:32,halign:'right',fontStyle:'bold',textColor:[5,100,60]}},
+      alternateRowStyles:{fillColor:[248,246,255]},
+      theme:'striped', margin:{left:14,right:14}
+    });
+    return doc.lastAutoTable.finalY;
+  }
+  const uR=rowsFor('uber'), dR=rowsFor('dd');
+  if(uR.length) lastY=platformTable('UBER EATS',[6,193,103],uR,lastY)+7;
+  if(dR.length) lastY=platformTable('DOORDASH',[255,48,8],dR,lastY)+7;
+
+  if(!uR.length && !dR.length){
+    doc.setFillColor(230,248,240); doc.roundedRect(14,lastY,182,16,3,3,'F');
+    doc.setFillColor(5,150,105); doc.roundedRect(14,lastY,4,16,2,2,'F');
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+    doc.text('Balance This Week',22,lastY+10);
+    doc.setTextColor(5,100,60); doc.setFontSize(13);
+    doc.text(netDisplay,196,lastY+10,{align:'right'});
+    lastY+=16;
+  } else {
+    doc.setFillColor(230,248,240); doc.roundedRect(14,lastY,182,14,2,2,'F');
+    doc.setFillColor(5,150,105); doc.roundedRect(14,lastY,3,14,1,1,'F');
+    doc.setFontSize(10.5); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+    doc.text('TOTAL BALANCE',20,lastY+9);
+    const tbW=doc.getTextWidth('TOTAL BALANCE');
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,140);
+    doc.text('· Solde total',20+tbW+2,lastY+9);
+    doc.setTextColor(5,100,60); doc.setFontSize(12.5);
+    doc.text(netDisplay,196,lastY+9,{align:'right'});
+    lastY+=14;
+  }
+
+  /* payment details — only for restaurants you tick */
+  if(opt.showFees && r.gross>0){
+    const dRows=[];
+    if(r.ut>0 && r.dt>0){
+      dRows.push(['Uber Eats sales  ·  Ventes Uber Eats',money(r.ut)]);
+      dRows.push(['DoorDash sales  ·  Ventes DoorDash',money(r.dt)]);
+    }
+    dRows.push(['Gross sales  ·  Ventes brutes',money(r.gross)]);
+    if(r.refund>0) dRows.push(['Refunds  ·  Remboursements','- '+money(r.refund)]);
+    /* commission and the tablet fee are shown as one line, never itemised */
+    const ded=r2(r.gross-r.refund-netAmt);
+    if(ded>0) dRows.push(['Commission & fees  ·  Commission et frais','- '+money(ded)]);
+    else if(ded<0) dRows.push(['Credits  ·  Crédits','+ '+money(Math.abs(ded))]);
+    dRows.push(['NET BALANCE  ·  Solde net',money(netAmt)]);
+
+    const dY=lastY+8;
+    doc.setFillColor(37,99,235); doc.circle(15.5,dY-1.1,1.6,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+    doc.text('PAYMENT DETAILS',19,dY);
+    const pdW=doc.getTextWidth('PAYMENT DETAILS');
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(150,140,175);
+    doc.text('· Détail du paiement',19+pdW+2,dY);
+    doc.autoTable({
+      startY:dY+3, body:dRows, styles:{fontSize:8,cellPadding:2.4},
+      columnStyles:{0:{cellWidth:150,halign:'left',textColor:[40,45,60]},
+                    1:{cellWidth:32,halign:'right',fontStyle:'bold',textColor:[30,64,175]}},
+      alternateRowStyles:{fillColor:[248,250,255]}, theme:'striped', margin:{left:14,right:14},
+      didParseCell(d){ if(d.row.index===dRows.length-1){
+        d.cell.styles.fontStyle='bold'; d.cell.styles.fillColor=[219,234,254];
+        d.cell.styles.textColor=[30,64,175]; } }
+    });
+    lastY=doc.lastAutoTable.finalY;
+  }
+
+  /* the balance already includes sales tax — show the split */
+  const rate=partnerTaxRate(r.name);
+  if(!isNaN(rate) && rate>0 && netAmt>0){
+    const preTax=Math.round((netAmt/(1+rate/100))*100)/100;
+    const taxAmt=Math.round((netAmt-preTax)*100)/100;
+    const taxRows=[
+      ['Subtotal before taxes  ·  Sous-total avant taxes',money(preTax)],
+      ['Net Taxes  ·  Taxes nettes',money(taxAmt)],
+      ['TOTAL PAID (taxes incl.)  ·  Total versé (taxes incl.)',money(netAmt)]
+    ];
+    const taxY=lastY+8;
+    doc.setFillColor(124,58,237); doc.circle(15.5,taxY-1.1,1.6,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+    doc.text('TAX BREAKDOWN',19,taxY);
+    const txW=doc.getTextWidth('TAX BREAKDOWN');
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(150,140,175);
+    doc.text('· Détail des taxes',19+txW+2,taxY);
+    doc.autoTable({
+      startY:taxY+3, body:taxRows, styles:{fontSize:8,cellPadding:2.4},
+      columnStyles:{0:{cellWidth:150,halign:'left',textColor:[40,45,60]},
+                    1:{cellWidth:32,halign:'right',fontStyle:'bold',textColor:[76,29,149]}},
+      alternateRowStyles:{fillColor:[248,246,255]}, theme:'striped', margin:{left:14,right:14},
+      didParseCell(d){ if(d.row.index===taxRows.length-1){
+        d.cell.styles.fontStyle='bold'; d.cell.styles.fillColor=[237,233,254];
+        d.cell.styles.textColor=[76,29,149]; } }
+    });
+    lastY=doc.lastAutoTable.finalY;
+  }
+
+  const note=stripEmoji(opt.note);
+  if(note){
+    const y=lastY+8, lines=doc.splitTextToSize(note,158), hgt=14+lines.length*6;
+    doc.setFillColor(255,251,235); doc.roundedRect(14,y,182,hgt,2,2,'F');
+    doc.setFillColor(245,158,11); doc.roundedRect(14,y,3,hgt,1,1,'F');
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(146,64,14);
+    doc.text((stripEmoji(opt.noteTitle)||'NOTE').toUpperCase(),20,y+7);
+    doc.setFont('helvetica','normal'); doc.setTextColor(92,40,0); doc.setFontSize(9);
+    doc.text(lines,20,y+14);
+  }
+
+  const ph=doc.internal.pageSize.height;
+  doc.setFillColor(124,58,237); doc.rect(0,ph-14,210,14,'F');
+  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(220,210,255);
+  doc.text('BRANCHEF',14,ph-6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(200,190,240);
+  doc.text('branchef.ca  ·  salesteam@getbranchef.com  ·  (438) 453-0588',42,ph-6);
+  return doc;
+}
+
+function pdfName(r){
+  return 'BRANCHEF-'+stripEmoji(r.name).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'')
+    +'-'+(S.week.b||'').replace(/-/g,'')+'.pdf';
+}
+function onePdf(i){ const r=(window._res||[])[i]; if(!r) return; partnerDoc(r).save(pdfName(r)); }
+function allPdf(){
+  const res=(window._res||[]).filter(r=>r.net>0);
+  if(!res.length){ toast('Nothing to send yet'); return; }
+  let doc=null;
+  res.forEach((r,i)=>{ if(i) doc.addPage(); doc=partnerDoc(r,doc); });
+  doc.save('BRANCHEF-All-Partners-'+(S.week.b||'').replace(/-/g,'')+'.pdf');
+}
+
+function setPdfOpt(name,k,v){
+  if(!S.pdfOpts) S.pdfOpts={};
+  if(!S.pdfOpts[name]) S.pdfOpts[name]={};
+  S.pdfOpts[name][k]= (k==='showFees') ? !!v : v;
+  save();
+}
+function setTaxRate(name,v){
+  if(!S.taxRate) S.taxRate={};
+  S.taxRate[name]= v===''?'':Number(v);
+  save(); renderPartnerReports();
+}
+
+
+function renderPartnerReports(){
+  const res=(window._res&&window._res.length)?window._res:calc().res;
+  window._res=res;
+  const paid=res.filter(r=>r.net>0);
+  $('prTotals').innerHTML = cell('Reports',paid.length)
+    + cell('To pay out',money(paid.reduce((s,r)=>s+r.net,0)),'g')
+    + cell('Week',(S.week.a||'')+' → '+(S.week.b||''));
+  $('prList').innerHTML = paid.length ? paid.map((r,i)=>{
+    const gi=res.indexOf(r);
+    const o=(S.pdfOpts&&S.pdfOpts[r.name])||{};
+    return '<div class="pc"><div class="pc-h" style="cursor:default">'
+      + '<div class="pc-name">'+esc(r.name)+'</div>'
+      + '<div style="text-align:right"><div class="pc-net">'+money(r.net)+'</div>'
+      + '<div class="pc-gross">UE '+money(r.ut)+' · DD '+money(r.dt)+' · tax '+partnerTaxRate(r.name)+'%</div>'
+      + '<div class="pc-gross">'+(partnerEmail(r.name)
+          ? esc(partnerEmail(r.name))
+          : '<span style="color:var(--amber)">no email yet</span>')+'</div></div>'
+      + '<button class="btn sm" onclick="onePdf('+gi+')">PDF</button>'
+      + '<button class="btn sm '+(wasSent(r.name)?'':'primary')+'" onclick="sendOne('+gi+')">'
+      + (wasSent(r.name)?'Sent ✓':'Send')+'</button></div>'
+      + '<div class="pc-b" style="display:block;padding-top:12px">'
+      + '<div class="inputs" style="margin-top:0;border-top:none;padding-top:0">'
+      + prFld(r.name,'orders','Orders',o.orders)
+      + prFld(r.name,'cancelled','Cancelled',o.cancelled)
+      + '<div class="fld"><label>Tax %</label><input class="mono" type="number" step="0.001" value="'+partnerTaxRate(r.name)
+        +'" oninput="setTaxRate('+JSON.stringify(r.name).replace(/"/g,'&quot;')+',this.value)" /></div>'
+      + '<div class="fld"><label>Show payment details</label>'
+        + '<label style="display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:500;margin-top:4px">'
+        + '<input type="checkbox" '+(o.showFees?'checked':'')+' onchange="setPdfOpt('+JSON.stringify(r.name).replace(/"/g,'&quot;')+',\'showFees\',this.checked)" style="width:16px;height:16px" />'
+        + 'Include the fee breakdown</label></div>'
+      + '</div>'
+      + '<div class="fld" style="margin-top:10px"><label>Note on the report (optional)</label>'
+      + '<input placeholder="Anything you want them to read" value="'+esc(o.note||'')
+      + '" oninput="setPdfOpt('+JSON.stringify(r.name).replace(/"/g,'&quot;')+',\'note\',this.value)" '
+      + 'style="font-family:Inter" /></div>'
+      + '</div></div>';
+  }).join('') : '<div class="empty"><h3>Nothing to report yet</h3><p>Load the week and calculate the payouts first.</p></div>';
+}
+function prFld(name,k,label,v){
+  return '<div class="fld"><label>'+label+'</label><input class="mono" value="'+esc(v||'')
+    +'" oninput="setPdfOpt('+JSON.stringify(name).replace(/"/g,'&quot;')+',\''+k+'\',this.value)" /></div>';
+}
+
 /* ---------- finance sheet ------------------------------------ */
 function renderFinance(){
   const res=(window._res&&window._res.length)?window._res:calc().res;
@@ -1608,7 +2054,7 @@ function barInfo(){
 }
 
 /* ---------- nav ---------------------------------------------- */
-const TABS=[['Files',1],['Payouts',2],['Report',3],['Finance',7],['Payments',4],['Stores',5],['Restaurants',6]];
+const TABS=[['Files',1],['Payouts',2],['Report',3],['Partner reports',8],['Finance',7],['Payments',4],['Stores',5],['Restaurants',6]];
 function renderNav(){
   const {need,orph}=calc();
   const unpaid=payRows().filter(r=>!isPaid(r.status)).length;
@@ -1627,6 +2073,7 @@ function go(n){
   cur=n;
   TABS.forEach(([,i])=>$('v'+i).classList.toggle('on',i===n));
   if(n===7) renderFinance();
+  if(n===8) renderPartnerReports();
   if(n===2) renderResults();
   if(n===3){ renderResults(); }
   if(n===4) renderPayments();
