@@ -1531,6 +1531,7 @@ function partnerDoc(r, existing){
   const wl = (S.week.a&&S.week.b) ? S.week.a.replace(/-/g,'/')+' / '+S.week.b.replace(/-/g,'/') : '';
   const today = new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
   const opt = (S.pdfOpts&&S.pdfOpts[r.name]) || {};
+  const startPage = doc.internal.getNumberOfPages();
 
   /* header */
   doc.setFillColor(255,255,255); doc.rect(0,0,210,40,'F');
@@ -1570,7 +1571,29 @@ function partnerDoc(r, existing){
   doc.setTextColor(209,250,229); doc.setFontSize(7); doc.setFont('helvetica','normal');
   doc.text('Week: '+wl,190,cardY+8,{align:'right'});
 
-  let lastY=cardY+40;
+  let lastY=cardY+36;
+
+  /* Sections were being drawn wherever lastY happened to land, which pushed
+     headings off the bottom and left the next page half empty. Ask for room
+     before drawing anything, and start a proper continuation page if short. */
+  const PAGE_BOTTOM = 270;
+  function contHeader(){
+    doc.setFillColor(255,255,255); doc.rect(0,0,210,22,'F');
+    doc.setFillColor(124,58,237); doc.rect(0,0,5,22,'F');
+    doc.setTextColor(26,26,46); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('BRANCHEF',12,13);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140,130,170);
+    doc.text(stripEmoji(r.name).toUpperCase()+'  ·  continued',44,13);
+    doc.setFontSize(7.5); doc.setTextColor(120,110,160);
+    doc.text('Week: '+wl,196,13,{align:'right'});
+    doc.setDrawColor(226,222,240); doc.setLineWidth(0.4); doc.line(0,22,210,22);
+  }
+  function ensure(need){
+    if(lastY + need <= PAGE_BOTTOM) return;
+    doc.addPage(); contHeader(); lastY=32;
+  }
+  /* autoTable can flow onto the next page on its own — follow it */
+  function afterTable(){ lastY=doc.lastAutoTable.finalY; }
 
   /* a strip of the week at a glance, under the balance */
   const nBrands = r.uber.length + r.dd.length;
@@ -1582,6 +1605,7 @@ function partnerDoc(r, existing){
   stats.push({k:'BRANDS',    fr:'Marques',     v:String(nBrands)});
   stats.push({k:'PLATFORMS', fr:'Plateformes', v:(r.ut>0&&r.dt>0)?'2':'1'});
   const sw=182/stats.length;
+  ensure(22);
   doc.setFillColor(248,246,255); doc.roundedRect(14,lastY,182,17,2,2,'F');
   stats.forEach((s,i)=>{
     const x=14+i*sw;
@@ -1591,7 +1615,7 @@ function partnerDoc(r, existing){
     doc.setFontSize(11); doc.setTextColor(46,32,88);
     doc.text(s.v, x+sw/2, lastY+13.4, {align:'center'});
   });
-  lastY+=25;
+  lastY+=21;
 
   /* every brand, with the week's deductions spread across them by share of sales
      so the printed lines always add up to the balance */
@@ -1611,25 +1635,29 @@ function partnerDoc(r, existing){
 
   const rowsFor=p=>items.filter(i=>i.plat===p).map(i=>[cleanBrand(i.name),money(i.net)]);
   function platformTable(title,dot,rows,y){
+    ensure(22); y=lastY;                       /* keep the heading with its table */
     doc.setFillColor(dot[0],dot[1],dot[2]); doc.circle(15.5,y-1.1,1.6,'F');
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
     doc.text(title,19,y);
     doc.autoTable({
       startY:y+3, head:[['Virtual Brand  ·  Marque','Net']], body:rows,
-      styles:{fontSize:8,cellPadding:2.4},
+      styles:{fontSize:8,cellPadding:2.1},
       headStyles:{fillColor:[26,26,46],textColor:255,fontStyle:'bold',fontSize:8},
       columnStyles:{0:{cellWidth:150,halign:'left',textColor:[40,45,60]},
                     1:{cellWidth:32,halign:'right',fontStyle:'bold',textColor:[5,100,60]}},
       alternateRowStyles:{fillColor:[248,246,255]},
-      theme:'striped', margin:{left:14,right:14}
+      theme:'striped', margin:{left:14,right:14,top:32},
+      rowPageBreak:'avoid',
+      didDrawPage(d){ if(doc.internal.getNumberOfPages()>startPage) contHeader(); }
     });
     return doc.lastAutoTable.finalY;
   }
   const uR=rowsFor('uber'), dR=rowsFor('dd');
-  if(uR.length) lastY=platformTable('UBER EATS',[6,193,103],uR,lastY)+7;
-  if(dR.length) lastY=platformTable('DOORDASH',[255,48,8],dR,lastY)+7;
+  if(uR.length){ platformTable('UBER EATS',[6,193,103],uR,lastY); afterTable(); lastY+=5; }
+  if(dR.length){ platformTable('DOORDASH',[255,48,8],dR,lastY);  afterTable(); lastY+=5; }
 
   if(!uR.length && !dR.length){
+    ensure(22);
     doc.setFillColor(230,248,240); doc.roundedRect(14,lastY,182,16,3,3,'F');
     doc.setFillColor(5,150,105); doc.roundedRect(14,lastY,4,16,2,2,'F');
     doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
@@ -1638,6 +1666,7 @@ function partnerDoc(r, existing){
     doc.text(netDisplay,196,lastY+10,{align:'right'});
     lastY+=16;
   } else {
+    ensure(20);
     doc.setFillColor(230,248,240); doc.roundedRect(14,lastY,182,14,2,2,'F');
     doc.setFillColor(5,150,105); doc.roundedRect(14,lastY,3,14,1,1,'F');
     doc.setFontSize(10.5); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
@@ -1665,6 +1694,7 @@ function partnerDoc(r, existing){
     else if(ded<0) dRows.push(['Credits  ·  Crédits','+ '+money(Math.abs(ded))]);
     dRows.push(['NET BALANCE  ·  Solde net',money(netAmt)]);
 
+    ensure(16+dRows.length*7);
     const dY=lastY+8;
     doc.setFillColor(37,99,235); doc.circle(15.5,dY-1.1,1.6,'F');
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
@@ -1694,6 +1724,7 @@ function partnerDoc(r, existing){
       ['Net Taxes  ·  Taxes nettes',money(taxAmt)],
       ['TOTAL PAID (taxes incl.)  ·  Total versé (taxes incl.)',money(netAmt)]
     ];
+    ensure(38);                                /* heading + three rows */
     const taxY=lastY+8;
     doc.setFillColor(124,58,237); doc.circle(15.5,taxY-1.1,1.6,'F');
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
@@ -1715,7 +1746,9 @@ function partnerDoc(r, existing){
 
   const note=stripEmoji(opt.note);
   if(note){
-    const y=lastY+8, lines=doc.splitTextToSize(note,158), hgt=14+lines.length*6;
+    const lines=doc.splitTextToSize(note,158), hgt=14+lines.length*6;
+    ensure(hgt+10);
+    const y=lastY+8;
     doc.setFillColor(255,251,235); doc.roundedRect(14,y,182,hgt,2,2,'F');
     doc.setFillColor(245,158,11); doc.roundedRect(14,y,3,hgt,1,1,'F');
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(146,64,14);
@@ -1725,11 +1758,16 @@ function partnerDoc(r, existing){
   }
 
   const ph=doc.internal.pageSize.height;
-  doc.setFillColor(124,58,237); doc.rect(0,ph-14,210,14,'F');
-  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(220,210,255);
-  doc.text('BRANCHEF',14,ph-6);
-  doc.setFont('helvetica','normal'); doc.setTextColor(200,190,240);
-  doc.text('branchef.ca  ·  salesteam@getbranchef.com  ·  (438) 453-0588',42,ph-6);
+  const first=startPage, last=doc.internal.getNumberOfPages();
+  for(let pg=first; pg<=last; pg++){
+    doc.setPage(pg);
+    doc.setFillColor(124,58,237); doc.rect(0,ph-14,210,14,'F');
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(220,210,255);
+    doc.text('BRANCHEF',14,ph-6);
+    doc.setFont('helvetica','normal'); doc.setTextColor(200,190,240);
+    doc.text('branchef.ca  ·  salesteam@getbranchef.com  ·  (438) 453-0588',42,ph-6);
+    if(last>first) doc.text('Page '+(pg-first+1)+' of '+(last-first+1),196,ph-6,{align:'right'});
+  }
   return doc;
 }
 
