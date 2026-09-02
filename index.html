@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BranChef</title>
-<meta name="bc-version" content="2026082401">
+<meta name="bc-version" content="2026090201">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -794,16 +794,32 @@ function updatePresence(){
 // LOAD DATA
 // ==========================================
 function loadData(){
-  db.collection('restaurants').orderBy('createdAt','desc').onSnapshot(function(s){
+  var isOwner=(CU.role==='owner');
+
+  // Owners see everything. Onboarding sees the full pipeline (they work it).
+  // Sales only ever load their OWN documents — nothing else reaches the browser.
+  var qRest = (isOwner || CU.role==='onboarding')
+    ? db.collection('restaurants').orderBy('createdAt','desc')
+    : db.collection('restaurants').where('submittedBy','==',CU.name).orderBy('createdAt','desc');
+
+  var qLeads = isOwner
+    ? db.collection('leads').orderBy('createdAt','desc')
+    : db.collection('leads').where('submittedBy','==',CU.name).orderBy('createdAt','desc');
+
+  var qTabs = isOwner
+    ? db.collection('tablets').orderBy('createdAt','desc')
+    : db.collection('tablets').where('submittedBy','==',CU.name).orderBy('createdAt','desc');
+
+  qRest.onSnapshot(function(s){
     restaurants=[];s.forEach(function(d){restaurants.push(Object.assign({id:d.id},d.data()));});
     refreshCurrentPage();
   });
-  db.collection('leads').orderBy('createdAt','desc').onSnapshot(function(s){
+  qLeads.onSnapshot(function(s){
     leads=[];s.forEach(function(d){leads.push(Object.assign({id:d.id},d.data()));});
     var al=document.querySelector('.sb-item.active');
     if(al&&al.id==='nav-leads')renderLeads();
   });
-  db.collection('tablets').orderBy('createdAt','desc').onSnapshot(function(s){
+  qTabs.onSnapshot(function(s){
     tablets=[];s.forEach(function(d){tablets.push(Object.assign({id:d.id},d.data()));});
     refreshCurrentPage();
   });
@@ -1209,19 +1225,27 @@ function completeStep(id,stepIndex){
 // TABLET
 // ==========================================
 function renderTablet(){
-  var pendingRows=tablets.filter(function(t){return t.status==='pending';}).map(function(t){
+  var isOwner=(CU.role==='owner');
+  var visible=tablets.filter(function(t){
+    if(t.status!=='pending')return false;
+    return isOwner || t.submittedBy===CU.name;
+  });
+  var pendingRows=visible.map(function(t){
     return '<tr>'
       +'<td><strong>'+esc(t.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(t.address)+'</div></td>'
-      +'<td>'+esc(t.submittedBy)+'</td>'
+      +(isOwner?'<td>'+esc(t.submittedBy)+'</td>':'')
       +'<td><span class="pill pill-pending">Pending</span></td>'
-      +(CU.role==='owner'?'<td><button class="btn btn-success" onclick="markShipped(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'<td></td>')
+      +(isOwner?'<td><button class="btn btn-success" onclick="markShipped(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'')
       +'</tr>';
   }).join('');
+  var headCols='<th>Restaurant</th>'+(isOwner?'<th>Submitted by</th>':'')
+    +'<th>Status</th>'+(isOwner?'<th></th>':'');
 
   var salesNotice='';
   if(CU.role==='sales'){
     var myApprv=leads.filter(function(l){return l.status==='approved'&&l.submittedBy===CU.name;});
-    var tabNm=new Set(tablets.map(function(tb){return (tb.restaurantName||'').toLowerCase().trim();}));
+    var tabNm=new Set(tablets.filter(function(tb){return tb.submittedBy===CU.name;})
+      .map(function(tb){return (tb.restaurantName||'').toLowerCase().trim();}));
     var avlb=myApprv.filter(function(l){return !tabNm.has((l.restaurantName||'').toLowerCase().trim());});
     if(!avlb.length){
       salesNotice='<div style="background:#fff8e6;border:1.5px solid #ffd166;border-radius:12px;padding:14px 16px;margin-bottom:16px;">'
@@ -1251,9 +1275,9 @@ function renderTablet(){
     +'<button class="btn btn-primary btn-full" onclick="submitTablet()" id="btn-tablet" style="margin-top:8px;">📦 Send tablet request</button>'
     +'</div></div>'
     +'<div>'
-    +'<div class="sec-lbl">Pending requests ('+tablets.filter(function(t){return t.status==='pending';}).length+')</div>'
+    +'<div class="sec-lbl">'+(isOwner?'Pending requests':'My pending requests')+' ('+visible.length+')</div>'
     +'<div class="card">'
-    +(pendingRows?'<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Submitted by</th><th>Status</th><th></th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>'
+    +(pendingRows?'<div class="tbl-wrap"><table><thead><tr>'+headCols+'</tr></thead><tbody>'+pendingRows+'</tbody></table></div>'
       :'<div class="empty" style="padding:1.5rem;"><p>No pending requests 🎉</p></div>')
     +'</div>'
     +'</div>'
@@ -1264,7 +1288,8 @@ function submitTablet(){
   // Sales users must have an approved lead
   if(CU.role==='sales'){
     var myApproved=leads.filter(function(l){return l.status==='approved'&&l.submittedBy===CU.name;});
-    var tabNames=new Set(tablets.map(function(tb){return (tb.restaurantName||'').toLowerCase().trim();}));
+    var tabNames=new Set(tablets.filter(function(tb){return tb.submittedBy===CU.name;})
+      .map(function(tb){return (tb.restaurantName||'').toLowerCase().trim();}));
     var avail=myApproved.filter(function(l){return !tabNames.has((l.restaurantName||'').toLowerCase().trim());});
     if(!avail.length){showToast('No approved restaurant. Go to My Leads first.');return;}
   }
@@ -1501,7 +1526,8 @@ function renderLeadsOwner(){
 
 function renderLeadsSales(){
   var myLeads = leads.filter(function(l){ return l.submittedBy===CU.name; });
-  var tabletedNames = new Set(tablets.map(function(tb){ return (tb.restaurantName||'').toLowerCase().trim(); }));
+  var tabletedNames = new Set(tablets.filter(function(tb){ return tb.submittedBy===CU.name; })
+    .map(function(tb){ return (tb.restaurantName||'').toLowerCase().trim(); }));
   var approved = myLeads.filter(function(l){ return l.status==='approved' && !tabletedNames.has((l.restaurantName||'').toLowerCase().trim()); });
 
   var sc = {pending:'⏳ Contract sent — waiting for signature',pending_approval:'📋 Signed — awaiting Nadir',signed:'✍️ Signed',approved:'✅ Approved — can request tablet',rejected:'❌ Rejected'};
@@ -1917,10 +1943,15 @@ function loadClockReport(){
 
 
 function adminFullActivityReport(){
-  var salesOpts = Object.values(TEAM).filter(function(t){
+  // Include anyone who ever submitted data, even if they've left TEAM.
+  var seen=new Set(Object.values(TEAM).filter(function(t){
     return t.role==='sales' || t.role==='onboarding';
-  }).map(function(t){
-    return '<option value="'+t.name+'">'+t.name+'</option>';
+  }).map(function(t){ return t.name; }));
+  [].concat(leads,tablets,restaurants).forEach(function(x){
+    if(x && x.submittedBy) seen.add(x.submittedBy);
+  });
+  var salesOpts = Array.from(seen).sort().map(function(n){
+    return '<option value="'+esc(n)+'">'+esc(n)+'</option>';
   }).join('');
 
   document.getElementById('ma-title').textContent = '📊 Full Activity Report';
@@ -2636,7 +2667,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026082401';
+  var CURRENT = '2026090201';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
