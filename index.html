@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090401">
+<meta name="bc-version" content="2026090402">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3156,7 +3156,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 // from whoever has the app open. Works on any DocuSign plan.
 // ==========================================
 var DS_MAP={delivered:'viewed',completed:'pending_approval',declined:'rejected',voided:'rejected'};
-var DS_OPEN=['sending','pending','viewed'];   // only these may be overwritten
+var DS_OPEN=['sending','send_failed','pending','viewed'];   // only these may be overwritten
 
 function syncEnvelopes(){
   if(!CU||!db||!leads.length)return;
@@ -3166,6 +3166,26 @@ function syncEnvelopes(){
       if(!d||!d.ok)return;
       var live={};
       d.envelopes.forEach(function(e){live[e.envelopeId]=e;});
+
+      // Some leads never got their envelopeId saved - the page can reload
+      // between DocuSign accepting the envelope and Firestore being written.
+      // Match those back up by the name in the agreement subject.
+      var claimed={};
+      leads.forEach(function(l){ if(l.envelopeId) claimed[l.envelopeId]=1; });
+      leads.forEach(function(l){
+        if(l.envelopeId)return;
+        var nm=(l.restaurantName||'').trim().toLowerCase();
+        if(!nm)return;
+        for(var k in live){
+          if(claimed[k])continue;
+          if((live[k].subject||'').toLowerCase().indexOf(nm)>=0){
+            l.envelopeId=k; claimed[k]=1;
+            db.collection('leads').doc(l.id).update({envelopeId:k}).catch(function(){});
+            break;
+          }
+        }
+      });
+
       leads.forEach(function(l){
         if(!l.envelopeId)return;
         var e=live[l.envelopeId];
@@ -3197,6 +3217,14 @@ function notifyLead(l,next){
     msg='\u274C '+who+' declined the agreement';
     to=[l.submittedBy,'Nadir','Simo']; type='system';
   }
+  if(next==='pending_approval'&&typeof sendEmail==='function'){
+    sendEmail('SIGNED: '+who, l.submittedBy||'BranChef',
+      who+' signed the agreement. Owner: '+(l.ownerName||'')
+      +' | '+(l.ownerEmail||'')+' | '+(l.phone||'')
+      +' | Address: '+(l.address||'')
+      +' | Brands: '+((l.brands||[]).join(', ')||'-')
+      +' | Ship the tablet and start the setup.');
+  }
   var ref=db.collection('notifications').doc(l.id+'_'+next);
   ref.get().then(function(s){
     if(s.exists)return;   // another browser already wrote it
@@ -3220,7 +3248,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090401';
+  var CURRENT = '2026090402';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
