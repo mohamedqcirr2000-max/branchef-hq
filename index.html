@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090403">
+<meta name="bc-version" content="2026090404">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -451,35 +451,55 @@ h1,h2,h3{letter-spacing:-.02em}
   </div>
 </div>
 
+<!-- GENERIC ASK / CONFIRM MODAL -->
+<div class="overlay" id="modal-ask" onclick="if(event.target===this)uiClose(false)">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="ask-title"></div>
+        <div id="ask-sub" style="font-size:13px;color:var(--ink-3);margin-top:3px;display:none;"></div>
+      </div>
+      <button class="modal-close" onclick="uiClose(false)">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div id="ask-fields"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-ghost" style="flex:1;" id="ask-cancel" onclick="uiClose(false)">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" id="ask-ok" onclick="uiClose(true)">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- NEW TICKET MODAL -->
 <div class="overlay" id="modal-ticket" onclick="if(event.target===this)closeModal('modal-ticket')">
   <div class="modal" style="max-width:560px;">
     <div class="modal-hdr">
       <div>
-        <div class="modal-title">Open a ticket</div>
-        <div style="font-size:13px;color:var(--ink-3);margin-top:3px;">Tell us what is blocking you. Nadir and Saber see it right away.</div>
+        <div class="modal-title" id="tk-h1">Open a ticket</div>
+        <div style="font-size:13px;color:var(--ink-3);margin-top:3px;" id="tk-h2">Tell us what is blocking you.</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-ticket')">&#10005;</button>
     </div>
     <div class="modal-body">
       <div class="field">
-        <label>What is it about?</label>
+        <label id="tk-l1">What is it about?</label>
         <div class="brand-chips" id="tk-types"></div>
       </div>
       <div class="field">
-        <label>How urgent?</label>
+        <label id="tk-l2">How urgent?</label>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="tk-prio">
-          <button type="button" class="btn" data-p="low" onclick="tkPrio(this)">Can wait</button>
-          <button type="button" class="btn" data-p="normal" onclick="tkPrio(this)">This week</button>
-          <button type="button" class="btn" data-p="urgent" onclick="tkPrio(this)">Blocking orders</button>
+          <button type="button" class="btn" data-p="low" onclick="tkPrio(this)" id="tk-p1">Can wait</button>
+          <button type="button" class="btn" data-p="normal" onclick="tkPrio(this)" id="tk-p2">This week</button>
+          <button type="button" class="btn" data-p="urgent" onclick="tkPrio(this)" id="tk-p3">Blocking orders</button>
         </div>
       </div>
-      <div class="field"><label>Which restaurant? <span style="font-weight:400;color:var(--ink-3);text-transform:none;">- optional</span></label>
-        <input id="tk-resto" type="text" placeholder="Leave empty if it is not about one"></div>
-      <div class="field"><label>What happened?</label>
-        <textarea id="tk-detail" style="min-height:110px;" placeholder="What you expected, what you saw instead, and anything you already tried."></textarea></div>
+      <div class="field"><label id="tk-l3">Which restaurant?</label>
+        <input id="tk-resto" type="text"></div>
+      <div class="field"><label id="tk-l4">What happened?</label>
+        <textarea id="tk-detail" style="min-height:110px;"></textarea></div>
       <div style="display:flex;gap:10px;margin-top:6px;">
-        <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('modal-ticket')">Cancel</button>
+        <button class="btn btn-ghost" style="flex:1;" id="tk-cancel" onclick="closeModal('modal-ticket')">Cancel</button>
         <button class="btn btn-primary" style="flex:2;" id="tk-send" onclick="submitTicket()">Open the ticket</button>
       </div>
     </div>
@@ -499,6 +519,27 @@ var lang = localStorage.getItem('bc_lang') || 'en';
 
 var T = {
   en: {
+    cancel:'Cancel', save:'Save', saved:'Saved', password:'Password',
+    owners_only:'Owners only', gone:'Deleted',
+    del_title:'Delete', del_body:'It moves to Trash. Any owner can restore it from the Admin Panel for 30 days.', del_ok:'Move to Trash',
+    purge_title:'Delete forever?', purge_body:'this one really cannot be undone.', purge_ok:'Delete forever',
+    rej_title:'Reject this restaurant', rej_sub:'The sales person will see why.', rej_label:'Reason', rej_ph:'Optional, but it helps', rej_ok:'Reject',
+    onboarding_nav:'Onboarding', signed_nav:'Signed contracts',
+    pipe_title:'Onboarding', pipe_sub:'Every restaurant from signature to live. Each one moves step by step.',
+    appr_title:'Signed contracts', appr_sub:'These restaurants signed. Approve one and the tablet request is created automatically.',
+    appr_wait:'Waiting for you', appr_hist:'Full history', appr_none:'Nothing waiting',
+    tk_all:'Everything the team has raised.', tk_mine:'Problems you have raised.',
+    nt_title:'Notifications', nt_sub:'Your activity feed.', nt_none:'No notifications yet',
+    ask_about:'What is it about?', ask_urgent:'How urgent?', ask_which:'Which restaurant?',
+    ask_what:'What happened?', ask_open:'Open the ticket', tk_new_title:'Open a ticket',
+    tk_new_sub:'Tell us what is blocking you. Nadir and Saber see it right away.',
+    p_low:'Can wait', p_norm:'This week', p_urg:'Blocking orders',
+    opt_note:'- optional', no_resto:'Leave empty if it is not about one',
+    what_ph:'What you expected, what you saw instead, and anything you already tried.',
+    approve:'Approve', reject:'Reject', restaurant:'Restaurant', owner_c:'Owner', status_c:'Status', date_c:'Date',
+    trash:'Trash', trash_desc:'Restore anything deleted in the last 30 days',
+    trash_empty:'Trash is empty', trash_hint:'Deleted items land here and stay for 30 days.',
+    restore:'Restore', del_forever:'Delete forever', deleted_w:'Deleted',
     platform:'Operations platform',
     captcha_label:'Type the characters you see',
     captcha_placeholder:'Enter the code above',
@@ -588,6 +629,27 @@ var T = {
     ai_greeting:'👋 Hi! I\'m your BranChef AI assistant. Ask me anything about the platform, onboarding steps, or how things work!'
   },
   fr: {
+    cancel:'Annuler', save:'Enregistrer', saved:'Enregistré', password:'Mot de passe',
+    owners_only:'Propriétaires seulement', gone:'Supprimé',
+    del_title:'Supprimer', del_body:'L\'élément va dans la Corbeille. Un propriétaire peut le restaurer pendant 30 jours depuis le Panneau admin.', del_ok:'Mettre à la Corbeille',
+    purge_title:'Supprimer définitivement ?', purge_body:'celui-ci ne pourra vraiment pas être récupéré.', purge_ok:'Supprimer définitivement',
+    rej_title:'Refuser ce restaurant', rej_sub:'Le commercial verra la raison.', rej_label:'Raison', rej_ph:'Facultatif, mais ça aide', rej_ok:'Refuser',
+    onboarding_nav:'Intégration', signed_nav:'Contrats signés',
+    pipe_title:'Intégration', pipe_sub:'Chaque restaurant, de la signature jusqu\'à la mise en ligne. Étape par étape.',
+    appr_title:'Contrats signés', appr_sub:'Ces restaurants ont signé. Approuvez-en un et la demande de tablette se crée toute seule.',
+    appr_wait:'En attente de vous', appr_hist:'Historique complet', appr_none:'Rien en attente',
+    tk_all:'Tout ce que l\'équipe a signalé.', tk_mine:'Les problèmes que vous avez signalés.',
+    nt_title:'Notifications', nt_sub:'Votre fil d\'activité.', nt_none:'Aucune notification',
+    ask_about:'C\'est à propos de quoi ?', ask_urgent:'C\'est urgent ?', ask_which:'Quel restaurant ?',
+    ask_what:'Que s\'est-il passé ?', ask_open:'Ouvrir le ticket', tk_new_title:'Ouvrir un ticket',
+    tk_new_sub:'Dites-nous ce qui bloque. Nadir et Saber le voient tout de suite.',
+    p_low:'Peut attendre', p_norm:'Cette semaine', p_urg:'Bloque les commandes',
+    opt_note:'- facultatif', no_resto:'Laissez vide si ce n\'est pas lié à un restaurant',
+    what_ph:'Ce que vous attendiez, ce que vous avez vu, et ce que vous avez déjà essayé.',
+    approve:'Approuver', reject:'Refuser', restaurant:'Restaurant', owner_c:'Propriétaire', status_c:'Statut', date_c:'Date',
+    trash:'Corbeille', trash_desc:'Restaurez tout ce qui a été supprimé ces 30 derniers jours',
+    trash_empty:'La corbeille est vide', trash_hint:'Les éléments supprimés arrivent ici et y restent 30 jours.',
+    restore:'Restaurer', del_forever:'Supprimer définitivement', deleted_w:'Supprimé',
     platform:'Plateforme opérationnelle',
     captcha_label:'Tapez les caractères que vous voyez',
     captcha_placeholder:'Entrez le code ci-dessus',
@@ -695,12 +757,19 @@ function setLang(l){
   if(active){
     var id=active.id.replace('nav-','');
     document.getElementById('topbar-title').textContent=getPageTitle(id);
-    showPage(id,active);
+    showPage(id,document.getElementById('nav-'+id));
   }
+  ['topbar-lang-en','topbar-lang-fr'].forEach(function(bid){
+    var b=document.getElementById(bid); if(!b)return;
+    var on=(bid==='topbar-lang-'+lang);
+    b.style.background=on?'var(--brand)':'var(--gray-100)';
+    b.style.color=on?'#fff':'var(--gray-800)';
+    b.style.borderColor=on?'var(--brand)':'var(--gray-200)';
+  });
 }
 
 function getPageTitle(id){
-  var titles={reportcalc:'Report Calculator',reportsend:'Send Weekly Reports',resources:t('resources'),tickets:t('tickets'),leads:t('join_title'),dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
+  var titles={reportcalc:'Report Calculator',resources:t('resources'),tickets:t('tickets'),leads:(CU&&CU.role==='owner')?t('signed_nav'):t('join_title'),dashboard:t('dashboard'),add:t('add_resto'),wallet:'My Wallet',pipeline:CU&&CU.role==='onboarding'?t('my_restos'):t('onboarding_nav'),tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
   return titles[id]||id;
 }
 
@@ -752,7 +821,8 @@ var TEAM = {
   "nadirkassimi@getbranchef.com":{name:"Nadir",   role:"owner",      initials:"ND",av:"av-purple"},
   "saber@getbranchef.com":       {name:"Saber",   role:"onboarding", initials:"SB",av:"av-amber"},
   "nadege@getbranchef.com":      {name:"Nada",    role:"sales",      initials:"NA",av:"av-blue"},
-  "sophia@getbranchef.com":      {name:"Ines",    role:"sales",      initials:"IN",av:"av-coral"}
+  "sophia@getbranchef.com":      {name:"Ines",    role:"sales",      initials:"IN",av:"av-coral"},
+  "smsales@getbranchef.com":     {name:"Souleiman",role:"sales",      initials:"SO",av:"av-amber"}
 };
 
 var BRANDS = {
@@ -869,12 +939,11 @@ function buildNav(){
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'Operations'},
     {id:'add',ico:'plus-circle',label:t('add_resto')},
-    {id:'pipeline',ico:'list',label:'Pipeline'},
-    {id:'leads',ico:'tablet',label:'Approvals'},
+    {id:'pipeline',ico:'list',label:t('onboarding_nav')},
+    {id:'leads',ico:'tablet',label:t('signed_nav')},
     {id:'tablet',ico:'tablet',label:t('tablets')},
     {sec:'Finance'},
     {id:'reportcalc',ico:'tablet',label:'Report Calculator'},
-    {id:'reportsend',ico:'bell',label:'Send Weekly Reports'},
     {sec:t('team')},
     {sec:t('support')},
     {id:'resources',ico:'file',label:t('resources')},
@@ -1333,7 +1402,7 @@ function renderPipeline(){
     :'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🍽️</div><p>No restaurants yet</p><span>Add your first one using the + button</span></div>';
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>'+(isOnboarding?'My Restaurants':'Pipeline')+'</h2><p>Track every restaurant from onboarding to live.</p></div>'
+    '<div class="page-hdr"><h2>'+(isOnboarding?t('my_restos'):t('pipe_title'))+'</h2><p>'+t('pipe_sub')+'</p></div>'
     +filterHtml
     +'<div class="card">'+tableHtml+'</div>';
 }
@@ -1346,8 +1415,11 @@ function setPipeFilter(f,btn){
 // Nothing is destroyed on delete - it goes to Trash for 30 days and any
 // owner can put it back. Admin Panel > Trash.
 function softDelete(coll,id,label){
-  if(CU.role!=='owner'){ showToast('Owners only'); return; }
-  if(!confirm('Delete "'+label+'"?\n\nIt moves to Trash and you can restore it from the Admin Panel.'))return;
+  if(CU.role!=='owner'){ showToast(t('owners_only')); return; }
+  uiAsk({title:t('del_title')+' "'+label+'"?', body:t('del_body'), ok:t('del_ok'), danger:true})
+    .then(function(v){ if(v) softDelete2(coll,id,label); });
+}
+function softDelete2(coll,id,label){
   db.collection(coll).doc(id).update({
     deleted:true, deletedBy:CU.name, deletedAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
@@ -1363,8 +1435,11 @@ function restoreItem(coll,id,label){
   }).then(function(){ showToast('Restored '+label); adminTrash(); });
 }
 function purgeItem(coll,id,label){
-  if(!confirm('Delete "'+label+'" forever?\n\nThis one really cannot be undone.'))return;
-  db.collection(coll).doc(id).delete().then(function(){ showToast('Gone'); adminTrash(); });
+  uiAsk({title:t('purge_title'), body:'"'+label+'" - '+t('purge_body'), ok:t('purge_ok'), danger:true})
+    .then(function(v){
+      if(!v)return;
+      db.collection(coll).doc(id).delete().then(function(){ showToast(t('gone')); adminTrash(); });
+    });
 }
 function deleteResto(id,name){ softDelete('restaurants',id,name); }
 
@@ -1749,11 +1824,11 @@ function renderLeadsOwner(){
       +'<br><span style="color:#aaa;font-size:11px;">By '+esc(l.submittedBy)+'</span>'
       +'</div></div>'
       +'<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">'
-      +'<button data-lid="'+l.id+'" data-lname="'+esc(l.restaurantName)+'" onclick="doApproveLead(this)" class="btn btn-success" style="font-size:12px;padding:6px 14px;">✅ Approve</button>'
-      +'<button data-lid="'+l.id+'" onclick="doRejectLead(this)" class="btn btn-danger" style="font-size:12px;padding:6px 14px;">❌ Reject</button>'
+      +'<button data-lid="'+l.id+'" data-lname="'+esc(l.restaurantName)+'" onclick="doApproveLead(this)" class="btn btn-success" style="font-size:12px;padding:6px 14px;">✅ '+t('approve')+'</button>'
+      +'<button data-lid="'+l.id+'" onclick="doRejectLead(this)" class="btn btn-danger" style="font-size:12px;padding:6px 14px;">❌ '+t('reject')+'</button>'
       +'</div>'
       +'</div></div>';
-  }).join('') : '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="color:var(--gray-400);font-size:13px;">No approvals pending 🎉</div></div>';
+  }).join('') : '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="color:var(--gray-400);font-size:13px;">'+t('appr_none')+' 🎉</div></div>';
 
   var scMap = {pending:'⏳ Sent',pending_approval:'📋 Signed — awaiting you',signed:'✍️ Signed',approved:'✅ Approved',rejected:'❌ Rejected'};
   var histRows = all.map(function(l){
@@ -1767,11 +1842,11 @@ function renderLeadsOwner(){
   }).join('');
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Approvals</h2><p>Approve restaurants after contract signature to allow tablet requests.</p></div>'
-    +'<div class="sec-lbl">Awaiting approval ('+pending.length+')</div>'
+    '<div class="page-hdr"><h2>'+t('appr_title')+'</h2><p>'+t('appr_sub')+'</p></div>'
+    +'<div class="sec-lbl">'+t('appr_wait')+' ('+pending.length+')</div>'
     +pendingHTML
-    +'<div class="sec-lbl">Full history ('+all.length+')</div>'
-    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Owner</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+histRows+'</tbody></table></div></div>';
+    +'<div class="sec-lbl">'+t('appr_hist')+' ('+all.length+')</div>'
+    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>'+t('restaurant')+'</th><th>'+t('owner_c')+'</th><th>'+t('status_c')+'</th><th>'+t('date_c')+'</th><th></th></tr></thead><tbody>'+histRows+'</tbody></table></div></div>';
 }
 
 function renderLeadsSales(){
@@ -1902,16 +1977,37 @@ function doApproveLead(btn){
     approvedBy:CU.name,
     approvedAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    addNotif('new','Approved: '+name+' - sales team can now request tablet!');
-    showToast('Approved! Sales team can now request tablet for '+name);
+    // Nadir approving IS the go-ahead to ship, so raise the tablet request here
+    // instead of making the sales person fill the same form again.
+    var lead=leads.filter(function(x){return x.id===id;})[0]||{};
+    var already=tablets.some(function(tb){
+      return (tb.restaurantName||'').toLowerCase().trim()===(name||'').toLowerCase().trim();
+    });
+    if(!already){
+      db.collection('tablets').add({
+        restaurantName:name, ownerName:lead.ownerName||'', phone:lead.phone||'',
+        address:lead.address||'', notes:'Auto-created when '+CU.name+' approved the signed contract.',
+        submittedBy:lead.submittedBy||CU.name, status:'pending',
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(){});
+    }
+    addNotif('tablet','Approved: '+name+' - tablet request created, ready to ship');
+    if(typeof sendEmail==='function')
+      sendEmail('SHIP TABLET: '+name, CU.name,
+        name+' is approved. Owner: '+(lead.ownerName||'')+' | '+(lead.phone||'')
+        +' | Ship to: '+(lead.address||'')+' | Brands: '+((lead.brands||[]).join(', ')||'-'));
+    showToast('Approved - tablet request created');
     renderLeads();
   }).catch(function(e){ showToast('Error: '+e.message); btn.disabled=false; btn.textContent='Approve'; });
 }
 
 function doRejectLead(btn){
   var id = btn.getAttribute('data-lid');
-  var reason = prompt('Reason for rejection (optional):');
-  if(reason===null)return;
+  uiAsk({title:t('rej_title'), sub:t('rej_sub'), ok:t('rej_ok'), danger:true,
+    fields:[{id:'why',label:t('rej_label'),multiline:true,placeholder:t('rej_ph')}]})
+  .then(function(v){ if(!v)return; doRejectLead2(id, v.why||''); });
+}
+function doRejectLead2(id, reason){
   db.collection('leads').doc(id).update({
     status:'rejected',
     rejectedBy:CU.name,
@@ -1951,10 +2047,10 @@ function renderNotifications(){
       +(n.read?'':'<div class="unread-dot"></div>')
       +(CU.role==='owner'?'<button class="btn btn-danger" style="padding:3px 8px;font-size:10.5px;align-self:center;" onclick="event.stopPropagation();softDelete(\'notifications\',\''+n.id+'\',\'this notification\')">Delete</button>':'')
       +'</div>';
-  }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>No notifications yet</p></div>';
+  }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>'+t('nt_none')+'</p></div>';
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Notifications</h2><p>Your activity feed.</p></div>'
+    '<div class="page-hdr"><h2>'+t('nt_title')+'</h2><p>'+t('nt_sub')+'</p></div>'
     +'<div class="card">'+html+'</div>';
 }
 
@@ -2088,9 +2184,13 @@ function copyLink(){
   navigator.clipboard.writeText(i.value).then(function(){ toastMsg('Link copied'); });
 }
 function editPayLink(){
-  var v=prompt('Paste the payment-details form link:', links.payment||'');
-  if(v===null) return;
-  db.collection('resources').doc('links').set({items:Object.assign({},links,{payment:v.trim()})},{merge:true});
+  uiAsk({title:t('pay_form'), ok:t('save'),
+    fields:[{id:'url',label:'URL',value:links.payment||'',placeholder:'https://...'}]})
+  .then(function(v){
+    if(!v)return;
+    db.collection('resources').doc('links').set({items:Object.assign({},links,{payment:v.url})},{merge:true});
+    toastMsg(t('saved'));
+  });
 }
 
 // ==========================================
@@ -2130,16 +2230,16 @@ function renderTickets(){
   var list=myTickets();
   var open=list.filter(function(t){return t.status!=='closed';});
   var closed=list.filter(function(t){return t.status==='closed';});
-  var html='<div class="page-hdr"><h2>Tickets</h2><p>'
-    +(canManage()?'Everything the team has raised.':'Problems you have raised.')+'</p></div>'
-    +'<div style="margin-bottom:1.25rem"><button class="btn" onclick="newTicket()">+ New ticket</button></div>';
+  var html='<div class="page-hdr"><h2>'+t('tickets')+'</h2><p>'
+    +(canManage()?t('tk_all'):t('tk_mine'))+'</p></div>'
+    +'<div style="margin-bottom:1.25rem"><button class="btn btn-primary" onclick="newTicket()">+ '+t('tk_new')+'</button></div>';
 
   html+= open.length
     ? '<div class="card" style="margin-bottom:1.25rem">'+open.map(ticketRow).join('')+'</div>'
-    : '<div class="card"><div class="empty" style="padding:2.5rem"><div class="empty-ico">✅</div><p>Nothing open right now</p></div></div>';
+    : '<div class="card"><div class="empty" style="padding:2.5rem"><div class="empty-ico">✅</div><p>'+t('tk_none')+'</p></div></div>';
 
   if(closed.length){
-    html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1rem">Closed</h2></div>'
+    html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1rem">'+t('tk_closed')+'</h2></div>'
       +'<div class="card" style="opacity:.65">'+closed.slice(0,25).map(ticketRow).join('')+'</div>';
   }
   document.getElementById('content').innerHTML=html;
@@ -2176,6 +2276,13 @@ function newTicket(){
     return '<span class="brand-chip" data-t="'+esc(x)+'" onclick="tkPick(this)">'+esc(x)+'</span>';
   }).join('');
   tkType=null; tkPriority='normal';
+  var L={'tk-h1':t('tk_new_title'),'tk-h2':t('tk_new_sub'),'tk-l1':t('ask_about'),
+         'tk-l2':t('ask_urgent'),'tk-l3':t('ask_which')+' '+t('opt_note'),'tk-l4':t('ask_what'),
+         'tk-p1':t('p_low'),'tk-p2':t('p_norm'),'tk-p3':t('p_urg'),
+         'tk-cancel':t('cancel'),'tk-send':t('ask_open')};
+  Object.keys(L).forEach(function(k){var el=document.getElementById(k);if(el)el.textContent=L[k];});
+  document.getElementById('tk-resto').placeholder=t('no_resto');
+  document.getElementById('tk-detail').placeholder=t('what_ph');
   document.getElementById('tk-resto').value='';
   document.getElementById('tk-detail').value='';
   document.querySelectorAll('#tk-prio .btn').forEach(function(b){
@@ -2217,7 +2324,7 @@ function submitTicket(){
     closeModal('modal-ticket');
     toastMsg('Ticket sent to Nadir and Saber');
   }).catch(function(e){ toastMsg('Could not send: '+(e.message||e)); })
-  .then(function(){ btn.disabled=false; btn.textContent='Open the ticket'; });
+  .then(function(){ btn.disabled=false; btn.textContent=t('ask_open'); });
 }
 
 function setTicket(id,status){
@@ -2263,10 +2370,13 @@ function copyText(id){
 function editPiper(rid){
   var r=restaurants.filter(function(x){return x.id===rid;})[0]; if(!r) return;
   var c=r.piper||{};
-  var em=prompt('UrbanPiper email for '+r.name+':', c.email||''); if(em===null) return;
-  var pw=prompt('UrbanPiper password for '+r.name+':', c.password||''); if(pw===null) return;
+  uiAsk({title:'UrbanPiper Prime', sub:r.name, ok:t('save'),
+    fields:[{id:'em',label:'Email',value:c.email||''},{id:'pw',label:t('password'),value:c.password||''}]})
+  .then(function(v){ if(!v)return; savePiper(rid,r,v.em,v.pw); });
+}
+function savePiper(rid,r,em,pw){
   db.collection('restaurants').doc(rid).update({
-    piper:{email:em.trim(), password:pw.trim(), by:CU.name, at:Date.now()}
+    piper:{email:em, password:pw, by:CU.name, at:Date.now()}
   }).then(function(){
     addNotif('piper','Prime credentials ready for '+r.name+' — set by '+CU.name);
     toastMsg('Saved');
@@ -2449,7 +2559,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
     +'<div class="admin-card" onclick="adminMonthlyReport()"><div class="admin-card-ico">📄</div><div class="admin-card-title">Monthly Report (PDF)</div><div class="admin-card-desc">Download attendance PDF per employee</div></div>'
-    +'<div class="admin-card" onclick="adminTrash()"><div class="admin-card-ico">🗑️</div><div class="admin-card-title">Trash</div><div class="admin-card-desc">Restore anything deleted in the last 30 days</div></div>'
+    +'<div class="admin-card" onclick="adminTrash()"><div class="admin-card-ico">🗑️</div><div class="admin-card-title">'+t('trash')+'</div><div class="admin-card-desc">'+t('trash_desc')+'</div></div>'
     +'<div class="admin-card" onclick="adminFullActivityReport()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Full Activity Report</div><div class="admin-card-desc">Complete history: leads, tablets, restaurants, clock — all time</div></div>'
     +'</div>';
 }
@@ -2527,7 +2637,7 @@ function loadClockReport(){
 
 function adminTrash(){
   if(CU.role!=='owner'){ showToast('Owners only'); return; }
-  document.getElementById('ma-title').textContent='🗑️ Trash';
+  document.getElementById('ma-title').textContent='🗑️ '+t('trash');
   document.getElementById('ma-body').innerHTML='<div class="spin" style="margin:1rem auto;"></div>';
   openModal('modal-admin');
 
@@ -2555,7 +2665,7 @@ function adminTrash(){
     });
     var el=document.getElementById('ma-body');
     if(!items.length){
-      el.innerHTML='<div class="empty" style="padding:2rem"><div class="empty-ico">🗑️</div><p>Trash is empty</p><span>Deleted items land here and stay for 30 days.</span></div>';
+      el.innerHTML='<div class="empty" style="padding:2rem"><div class="empty-ico">🗑️</div><p>'+t('trash_empty')+'</p><span>'+t('trash_hint')+'</span></div>';
       return;
     }
     el.innerHTML='<p style="font-size:13px;color:var(--ink-3);margin-bottom:14px;">'
@@ -2568,11 +2678,11 @@ function adminTrash(){
           +'<div style="flex:1;min-width:180px;">'
           +'<div style="font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;">'+it.label+'</div>'
           +'<div style="font-size:13.5px;font-weight:700;margin-top:2px;word-break:break-word;">'+esc(String(it.nm).slice(0,90))+'</div>'
-          +'<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px;">Deleted '+when+' '+who+'</div>'
+          +'<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px;">'+t('deleted_w')+' '+when+' '+who+'</div>'
           +'</div>'
           +'<div style="display:flex;gap:6px;">'
-          +'<button class="btn btn-success" style="font-size:11.5px;padding:6px 12px;" onclick="restoreItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">Restore</button>'
-          +'<button class="btn btn-danger" style="font-size:11.5px;padding:6px 12px;" onclick="purgeItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">Delete forever</button>'
+          +'<button class="btn btn-success" style="font-size:11.5px;padding:6px 12px;" onclick="restoreItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">'+t('restore')+'</button>'
+          +'<button class="btn btn-danger" style="font-size:11.5px;padding:6px 12px;" onclick="purgeItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">'+t('del_forever')+'</button>'
           +'</div></div></div>';
       }).join('');
   });
@@ -3295,6 +3405,51 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 // ==========================================
+// IN-APP DIALOGS - replaces every browser prompt()/confirm()
+// ==========================================
+var _askResolve=null;
+function uiAsk(o){
+  return new Promise(function(res){
+    _askResolve=res;
+    document.getElementById('ask-title').textContent=o.title||'';
+    var sub=document.getElementById('ask-sub');
+    if(o.sub){sub.textContent=o.sub;sub.style.display='';}else{sub.style.display='none';}
+    var f=o.fields||[];
+    document.getElementById('ask-fields').innerHTML = f.length
+      ? f.map(function(x){
+          return '<div class="field"><label>'+esc(x.label||'')+'</label>'
+            +(x.multiline
+              ? '<textarea id="ask-f-'+x.id+'" placeholder="'+esc(x.placeholder||'')+'">'+esc(x.value||'')+'</textarea>'
+              : '<input id="ask-f-'+x.id+'" type="'+(x.type||'text')+'" value="'+esc(x.value||'')+'" placeholder="'+esc(x.placeholder||'')+'">')
+            +'</div>';
+        }).join('')
+      : (o.body?'<p style="font-size:14px;line-height:1.65;color:var(--ink-2);margin:0;white-space:pre-line;">'+esc(o.body)+'</p>':'');
+    var ok=document.getElementById('ask-ok');
+    ok.textContent=o.ok||'OK';
+    ok.className='btn '+(o.danger?'btn-danger':'btn-primary');
+    document.getElementById('ask-cancel').textContent=o.cancel||t('cancel');
+    openModal('modal-ask');
+    setTimeout(function(){var el=document.querySelector('#ask-fields input,#ask-fields textarea');if(el){el.focus();el.select&&el.select();}},80);
+  });
+}
+function uiClose(ok){
+  var res=_askResolve; _askResolve=null;
+  var vals={};
+  document.querySelectorAll('#ask-fields [id^="ask-f-"]').forEach(function(el){
+    vals[el.id.replace('ask-f-','')]=el.value.trim();
+  });
+  closeModal('modal-ask');
+  if(res)res(ok?vals:null);
+}
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  if(document.getElementById('modal-ask').classList.contains('open')){uiClose(false);return;}
+  ['modal-ticket','modal-resto','modal-admin'].forEach(function(id){
+    var el=document.getElementById(id); if(el)el.classList.remove('open');
+  });
+});
+
+// ==========================================
 // DOCUSIGN SYNC
 // DocuSign never calls us, so we ask it instead - every 60 seconds,
 // from whoever has the app open. Works on any DocuSign plan.
@@ -3392,7 +3547,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090403';
+  var CURRENT = '2026090404';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
