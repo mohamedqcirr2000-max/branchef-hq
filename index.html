@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090402">
+<meta name="bc-version" content="2026090403">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -448,6 +448,41 @@ h1,h2,h3{letter-spacing:-.02em}
   <div style="padding:12px;border-top:1px solid var(--gray-100);display:flex;gap:8px;">
     <input id="ai-input" type="text" placeholder="Ask anything…" style="flex:1;padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')sendAI()">
     <button onclick="sendAI()" style="background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" id="ai-send-btn">→</button>
+  </div>
+</div>
+
+<!-- NEW TICKET MODAL -->
+<div class="overlay" id="modal-ticket" onclick="if(event.target===this)closeModal('modal-ticket')">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">Open a ticket</div>
+        <div style="font-size:13px;color:var(--ink-3);margin-top:3px;">Tell us what is blocking you. Nadir and Saber see it right away.</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-ticket')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>What is it about?</label>
+        <div class="brand-chips" id="tk-types"></div>
+      </div>
+      <div class="field">
+        <label>How urgent?</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="tk-prio">
+          <button type="button" class="btn" data-p="low" onclick="tkPrio(this)">Can wait</button>
+          <button type="button" class="btn" data-p="normal" onclick="tkPrio(this)">This week</button>
+          <button type="button" class="btn" data-p="urgent" onclick="tkPrio(this)">Blocking orders</button>
+        </div>
+      </div>
+      <div class="field"><label>Which restaurant? <span style="font-weight:400;color:var(--ink-3);text-transform:none;">- optional</span></label>
+        <input id="tk-resto" type="text" placeholder="Leave empty if it is not about one"></div>
+      <div class="field"><label>What happened?</label>
+        <textarea id="tk-detail" style="min-height:110px;" placeholder="What you expected, what you saw instead, and anything you already tried."></textarea></div>
+      <div style="display:flex;gap:10px;margin-top:6px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('modal-ticket')">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" id="tk-send" onclick="submitTicket()">Open the ticket</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -996,21 +1031,21 @@ function loadData(){
     : db.collection('tablets').where('submittedBy','==',CU.name).orderBy('createdAt','desc');
 
   qRest.onSnapshot(function(s){
-    restaurants=[];s.forEach(function(d){restaurants.push(Object.assign({id:d.id},d.data()));});
+    restaurants=[];s.forEach(function(d){if(d.data().deleted)return;restaurants.push(Object.assign({id:d.id},d.data()));});
     refreshCurrentPage();
   });
   qLeads.onSnapshot(function(s){
-    leads=[];s.forEach(function(d){leads.push(Object.assign({id:d.id},d.data()));});
+    leads=[];s.forEach(function(d){if(d.data().deleted)return;leads.push(Object.assign({id:d.id},d.data()));});
     var al=document.querySelector('.sb-item.active');
     if(al&&al.id==='nav-leads')renderLeads();
   });
   qTabs.onSnapshot(function(s){
-    tablets=[];s.forEach(function(d){tablets.push(Object.assign({id:d.id},d.data()));});
+    tablets=[];s.forEach(function(d){if(d.data().deleted)return;tablets.push(Object.assign({id:d.id},d.data()));});
     refreshCurrentPage();
   });
   watchResources(); watchTickets(); scanFiches();
   db.collection('notifications').orderBy('createdAt','desc').limit(60).onSnapshot(function(s){
-    notifs=[];s.forEach(function(d){notifs.push(Object.assign({id:d.id},d.data()));});
+    notifs=[];s.forEach(function(d){if(d.data().deleted)return;notifs.push(Object.assign({id:d.id},d.data()));});
     updateBadge();
     var active=document.querySelector('.sb-item.active');
     if(active&&active.id==='nav-notifications')renderNotifications();
@@ -1308,13 +1343,30 @@ function setPipeFilter(f,btn){
   renderPipeline();
 }
 
-function deleteResto(id,name){
-  if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
-  db.collection('restaurants').doc(id).delete().then(function(){
-    addNotif('system','🗑️ '+CU.name+' deleted restaurant: '+name);
-    showToast('Deleted '+name);
-  });
+// Nothing is destroyed on delete - it goes to Trash for 30 days and any
+// owner can put it back. Admin Panel > Trash.
+function softDelete(coll,id,label){
+  if(CU.role!=='owner'){ showToast('Owners only'); return; }
+  if(!confirm('Delete "'+label+'"?\n\nIt moves to Trash and you can restore it from the Admin Panel.'))return;
+  db.collection(coll).doc(id).update({
+    deleted:true, deletedBy:CU.name, deletedAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    addNotif('system',CU.name+' deleted '+label+' - it is in Trash');
+    showToast('Moved to Trash');
+  }).catch(function(e){ showToast('Could not delete: '+(e.message||e)); });
 }
+function restoreItem(coll,id,label){
+  db.collection(coll).doc(id).update({
+    deleted:firebase.firestore.FieldValue.delete(),
+    deletedBy:firebase.firestore.FieldValue.delete(),
+    deletedAt:firebase.firestore.FieldValue.delete()
+  }).then(function(){ showToast('Restored '+label); adminTrash(); });
+}
+function purgeItem(coll,id,label){
+  if(!confirm('Delete "'+label+'" forever?\n\nThis one really cannot be undone.'))return;
+  db.collection(coll).doc(id).delete().then(function(){ showToast('Gone'); adminTrash(); });
+}
+function deleteResto(id,name){ softDelete('restaurants',id,name); }
 
 // ==========================================
 // RESTAURANT MODAL
@@ -1710,6 +1762,7 @@ function renderLeadsOwner(){
       +'<td style="font-size:12px;">'+esc(l.ownerName)+'<br><span style="color:#aaa;">'+esc(l.ownerEmail)+'</span></td>'
       +'<td>'+(scMap[l.status]||l.status)+'</td>'
       +'<td style="font-size:11px;color:#aaa;">'+timeAgo(l.createdAt)+'</td>'
+      +'<td><button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="softDelete(\'leads\',\''+l.id+'\',\''+esc(l.restaurantName)+'\')">Delete</button></td>'
       +'</tr>';
   }).join('');
 
@@ -1718,7 +1771,7 @@ function renderLeadsOwner(){
     +'<div class="sec-lbl">Awaiting approval ('+pending.length+')</div>'
     +pendingHTML
     +'<div class="sec-lbl">Full history ('+all.length+')</div>'
-    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Owner</th><th>Status</th><th>Date</th></tr></thead><tbody>'+histRows+'</tbody></table></div></div>';
+    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Owner</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+histRows+'</tbody></table></div></div>';
 }
 
 function renderLeadsSales(){
@@ -1896,6 +1949,7 @@ function renderNotifications(){
       +'<div class="notif-ico">'+(ICONS[n.type]||'📢')+'</div>'
       +'<div class="notif-body"><div class="notif-txt">'+esc(n.message)+'</div><div class="notif-time">'+timeAgo(n.createdAt)+'</div></div>'
       +(n.read?'':'<div class="unread-dot"></div>')
+      +(CU.role==='owner'?'<button class="btn btn-danger" style="padding:3px 8px;font-size:10.5px;align-self:center;" onclick="event.stopPropagation();softDelete(\'notifications\',\''+n.id+'\',\'this notification\')">Delete</button>':'')
       +'</div>';
   }).join(''):'<div class="empty" style="padding:2.5rem;"><div class="empty-ico">🔔</div><p>No notifications yet</p></div>';
 
@@ -2056,7 +2110,7 @@ var tickets=[];
 
 function watchTickets(){
   db.collection('tickets').orderBy('createdAt','desc').limit(120).onSnapshot(function(s){
-    tickets=[]; s.forEach(function(d){ tickets.push(Object.assign({id:d.id},d.data())); });
+    tickets=[]; s.forEach(function(d){ if(d.data().deleted)return; tickets.push(Object.assign({id:d.id},d.data())); });
     updateTicketBadge();
     var a=document.querySelector('.sb-item.active');
     if(a && a.id==='nav-tickets') renderTickets();
@@ -2097,7 +2151,8 @@ function ticketRow(t){
   return '<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--gray-100)">'
     +'<div style="display:flex;gap:.75rem;align-items:flex-start;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:200px">'
-        +'<div style="font-weight:700;font-size:.9rem">'+esc(t.type||'Ticket')
+        +(t.priority==='urgent'?'<span style="display:inline-block;background:#FDECEA;color:#C0392B;font-size:.65rem;font-weight:800;padding:.1rem .45rem;border-radius:999px;margin-right:.4rem">URGENT</span>':'')
+        +'<div style="font-weight:700;font-size:.9rem;display:inline">'+esc(t.type||'Ticket')
           +(t.restaurant?' <span style="font-weight:500;color:var(--gray-600)">· '+esc(t.restaurant)+'</span>':'')+'</div>'
         +(t.detail?'<div style="color:var(--gray-700);font-size:.85rem;margin-top:.35rem;white-space:pre-wrap">'+esc(t.detail)+'</div>':'')
         +'<div style="color:var(--gray-500);font-size:.75rem;margin-top:.45rem">'+esc(t.by||'')+' · '+age+'</div>'
@@ -2107,29 +2162,64 @@ function ticketRow(t){
       +(canManage()&&t.status!=='closed'
         ? '<div style="display:flex;gap:.4rem">'
           +(t.status!=='working'?'<button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.78rem" onclick="setTicket(\''+t.id+'\',\'working\')">Working on it</button>':'')
-          +'<button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.78rem" onclick="setTicket(\''+t.id+'\',\'closed\')">Close</button></div>'
+          +'<button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.78rem" onclick="setTicket(\''+t.id+'\',\'closed\')">Close</button>'
+          +(CU.role==='owner'?'<button class="btn btn-danger" style="padding:.3rem .7rem;font-size:.78rem" onclick="softDelete(\'tickets\',\''+t.id+'\',\''+esc(t.type||'ticket')+'\')">Delete</button>':'')
+          +'</div>'
         : '')
     +'</div></div>';
 }
 
+var tkType=null, tkPriority='normal';
+
 function newTicket(){
-  var opts=TICKET_TYPES.map(function(x,i){return (i+1)+'. '+x;}).join('\n');
-  var pick=prompt('What is the problem?\n\n'+opts+'\n\nType the number:');
-  if(pick===null) return;
-  var idx=parseInt(pick,10)-1;
-  if(isNaN(idx)||idx<0||idx>=TICKET_TYPES.length){ alert('Pick a number from the list.'); return; }
-  var resto=prompt('Which restaurant? (leave empty if it is not about one)','')||'';
-  var detail=prompt('Describe the problem:','')||'';
-  if(!detail.trim()){ alert('Please describe the problem so Nadir and Saber can act on it.'); return; }
+  document.getElementById('tk-types').innerHTML = TICKET_TYPES.map(function(x){
+    return '<span class="brand-chip" data-t="'+esc(x)+'" onclick="tkPick(this)">'+esc(x)+'</span>';
+  }).join('');
+  tkType=null; tkPriority='normal';
+  document.getElementById('tk-resto').value='';
+  document.getElementById('tk-detail').value='';
+  document.querySelectorAll('#tk-prio .btn').forEach(function(b){
+    b.classList.toggle('btn-primary', b.getAttribute('data-p')==='normal');
+  });
+  openModal('modal-ticket');
+  setTimeout(function(){ var el=document.getElementById('tk-detail'); if(el)el.focus(); },80);
+}
+
+function tkPick(el){
+  document.querySelectorAll('#tk-types .brand-chip').forEach(function(c){ c.classList.remove('on'); });
+  el.classList.add('on');
+  tkType=el.getAttribute('data-t');
+}
+
+function tkPrio(btn){
+  tkPriority=btn.getAttribute('data-p');
+  document.querySelectorAll('#tk-prio .btn').forEach(function(b){
+    b.classList.toggle('btn-primary', b===btn);
+  });
+}
+
+function submitTicket(){
+  var detail=document.getElementById('tk-detail').value.trim();
+  if(!tkType){ toastMsg('Pick what it is about first'); return; }
+  if(!detail){ toastMsg('Describe the problem so Nadir and Saber can act on it'); return; }
+  var resto=document.getElementById('tk-resto').value.trim();
+  var btn=document.getElementById('tk-send');
+  btn.disabled=true; btn.textContent='Sending...';
   db.collection('tickets').add({
-    type:TICKET_TYPES[idx], restaurant:resto.trim(), detail:detail.trim(),
+    type:tkType, restaurant:resto, detail:detail, priority:tkPriority,
     status:'open', by:CU.name, byEmail:CU.email,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    addNotif('ticket', CU.name+' raised a ticket: '+TICKET_TYPES[idx]+(resto?' — '+resto:''));
+    addNotif('ticket', CU.name+' raised a ticket: '+tkType+(resto?' - '+resto:'')
+      +(tkPriority==='urgent'?' [URGENT]':''));
+    if(typeof sendEmail==='function'&&tkPriority==='urgent')
+      sendEmail('URGENT ticket: '+tkType, CU.name, detail+(resto?' | Restaurant: '+resto:''));
+    closeModal('modal-ticket');
     toastMsg('Ticket sent to Nadir and Saber');
-  }).catch(function(e){ alert('Could not send the ticket: '+(e.message||e)); });
+  }).catch(function(e){ toastMsg('Could not send: '+(e.message||e)); })
+  .then(function(){ btn.disabled=false; btn.textContent='Open the ticket'; });
 }
+
 function setTicket(id,status){
   db.collection('tickets').doc(id).update({
     status:status, closedBy:CU.name, closedAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -2359,6 +2449,7 @@ function renderAdmin(){
     +'<div class="admin-card" onclick="adminEmailJS()"><div class="admin-card-ico">📧</div><div class="admin-card-title">Email Notifications</div><div class="admin-card-desc">Configure EmailJS for automatic alerts</div></div>'
     +'<div class="admin-card" onclick="adminStats()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Stats & Reports</div><div class="admin-card-desc">Restaurant counts, pipeline summary</div></div>'
     +'<div class="admin-card" onclick="adminMonthlyReport()"><div class="admin-card-ico">📄</div><div class="admin-card-title">Monthly Report (PDF)</div><div class="admin-card-desc">Download attendance PDF per employee</div></div>'
+    +'<div class="admin-card" onclick="adminTrash()"><div class="admin-card-ico">🗑️</div><div class="admin-card-title">Trash</div><div class="admin-card-desc">Restore anything deleted in the last 30 days</div></div>'
     +'<div class="admin-card" onclick="adminFullActivityReport()"><div class="admin-card-ico">📊</div><div class="admin-card-title">Full Activity Report</div><div class="admin-card-desc">Complete history: leads, tablets, restaurants, clock — all time</div></div>'
     +'</div>';
 }
@@ -2433,6 +2524,59 @@ function loadClockReport(){
 }
 
 
+
+function adminTrash(){
+  if(CU.role!=='owner'){ showToast('Owners only'); return; }
+  document.getElementById('ma-title').textContent='🗑️ Trash';
+  document.getElementById('ma-body').innerHTML='<div class="spin" style="margin:1rem auto;"></div>';
+  openModal('modal-admin');
+
+  var COLLS=[
+    {c:'restaurants',  label:'Restaurant',   name:function(d){return d.name;}},
+    {c:'leads',        label:'Lead',         name:function(d){return d.restaurantName;}},
+    {c:'tablets',      label:'Tablet',       name:function(d){return d.restaurantName;}},
+    {c:'tickets',      label:'Ticket',       name:function(d){return d.type;}},
+    {c:'notifications',label:'Notification', name:function(d){return d.message;}}
+  ];
+
+  Promise.all(COLLS.map(function(x){
+    return db.collection(x.c).where('deleted','==',true).get()
+      .then(function(sn){
+        var out=[];
+        sn.forEach(function(doc){ out.push({coll:x.c, label:x.label, id:doc.id, d:doc.data(), nm:x.name(doc.data())||'(untitled)'}); });
+        return out;
+      }).catch(function(){ return []; });
+  })).then(function(groups){
+    var items=[].concat.apply([],groups);
+    items.sort(function(a,b){
+      var ta=a.d.deletedAt&&a.d.deletedAt.toDate?a.d.deletedAt.toDate().getTime():0;
+      var tb=b.d.deletedAt&&b.d.deletedAt.toDate?b.d.deletedAt.toDate().getTime():0;
+      return tb-ta;
+    });
+    var el=document.getElementById('ma-body');
+    if(!items.length){
+      el.innerHTML='<div class="empty" style="padding:2rem"><div class="empty-ico">🗑️</div><p>Trash is empty</p><span>Deleted items land here and stay for 30 days.</span></div>';
+      return;
+    }
+    el.innerHTML='<p style="font-size:13px;color:var(--ink-3);margin-bottom:14px;">'
+      +items.length+' item'+(items.length>1?'s':'')+' in Trash. Restore puts it back exactly where it was.</p>'
+      +items.map(function(it){
+        var who=it.d.deletedBy?('by '+esc(it.d.deletedBy)):'';
+        var when=it.d.deletedAt?timeAgo(it.d.deletedAt):'';
+        return '<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;">'
+          +'<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">'
+          +'<div style="flex:1;min-width:180px;">'
+          +'<div style="font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;">'+it.label+'</div>'
+          +'<div style="font-size:13.5px;font-weight:700;margin-top:2px;word-break:break-word;">'+esc(String(it.nm).slice(0,90))+'</div>'
+          +'<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px;">Deleted '+when+' '+who+'</div>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px;">'
+          +'<button class="btn btn-success" style="font-size:11.5px;padding:6px 12px;" onclick="restoreItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">Restore</button>'
+          +'<button class="btn btn-danger" style="font-size:11.5px;padding:6px 12px;" onclick="purgeItem(\''+it.coll+'\',\''+it.id+'\',\''+esc(String(it.nm).slice(0,40)).replace(/'/g,"")+'\')">Delete forever</button>'
+          +'</div></div></div>';
+      }).join('');
+  });
+}
 
 function adminFullActivityReport(){
   // Include anyone who ever submitted data, even if they've left TEAM.
@@ -3248,7 +3392,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090402';
+  var CURRENT = '2026090403';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
