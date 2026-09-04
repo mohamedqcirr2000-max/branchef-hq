@@ -414,6 +414,9 @@ var T = {
     clock:'Clock In/Out',
     team:'Team',
     admin:'Admin Panel',
+    resources:'Resources',
+    tickets:'Tickets',
+    support:'Support',
     partners:'Partners',
     total:'Total restaurants',
     onboarding_pipe:'Being onboarded',
@@ -459,6 +462,9 @@ var T = {
     clock:'Pointage',
     team:'Équipe',
     admin:'Panneau admin',
+    resources:'Ressources',
+    tickets:'Tickets',
+    support:'Support',
     partners:'Partenaires',
     total:'Total restaurants',
     onboarding_pipe:'En cours d\'intégration',
@@ -504,7 +510,7 @@ function setLang(l){
 }
 
 function getPageTitle(id){
-  var titles={reportcalc:'Report Calculator',reportsend:'Send Weekly Reports',dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
+  var titles={reportcalc:'Report Calculator',reportsend:'Send Weekly Reports',resources:t('resources'),tickets:t('tickets'),dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
   return titles[id]||id;
 }
 
@@ -574,18 +580,29 @@ var BRANDS = {
 };
 
 var STEPS = [
-  {id:0,who:"Saber",title:"🔍 Find Empty Uber Eats Store",desc:"Find the empty store created by account manager on Uber Eats. Match it to this restaurant address.",note:"Enter the Uber Eats store name you found",alert:"Next: Fix address and pickup instructions"},
-  {id:1,who:"Saber",title:"📍 Fix Address & Pickup Instructions",desc:"Update store address to match restaurant. Add pickup instructions for drivers and customers explaining this is a virtual brand with a different name.",note:"Confirm address updated and pickup instructions added",alert:"Next: Prepare Marco list and contact Ritik"},
-  {id:2,who:"Saber",title:"📋 Prepare Marco List & Contact Ritik",desc:"Prepare the list of store names to send to Marco (name + phone changes). Contact Ritik to integrate the Uber Eats stores in UrbanPiper. Have the Marco list ready while waiting for Ritik.",note:"Paste the store names you sent to Ritik for UrbanPiper integration",alert:"Waiting for Ritik to write DONE. Zayd gets next step after Ritik confirms."},
-  {id:3,who:"Saber",title:"✅ Ritik Says DONE — Send List to Marco",desc:"Ritik wrote DONE in the group. Now send the prepared list to Marco to change store names and phone numbers on Uber Eats.",note:"Confirm you sent the list to Marco with store names and phone numbers",alert:"Zayd: Your turn! UrbanPiper integration begins now"},
-  {id:4,who:"Zayd",title:"🔗 UrbanPiper Integration",desc:"Enter UrbanPiper and complete the integration for all stores of this restaurant. Verify all brands are connected properly.",note:"Confirm all stores are integrated in UrbanPiper",alert:"Saber: Menu setup begins — enter restaurant and fix everything"},
-  {id:5,who:"Saber",title:"🍔 Menu Setup",desc:"Enter the restaurant on Uber Eats. Read the menu carefully. Match sides and drinks. Fix language: Quebec French menu or English for rest of Canada/USA. Fix prices. Upload correct brand photos.",note:"Confirm menu is complete — language, prices, photos all done. Note any issues.",alert:"Next: Update brand covers and mark Ready"},
-  {id:6,who:"Saber",title:"🎨 Update Covers & Mark Ready",desc:"Update the covers for all brands on this restaurant. Click Ready on Uber Eats. Write a detailed note of everything completed.",note:"Write your completion note — what was done, any special notes for owners",alert:"OWNERS: Restaurant ready for review! Please check and approve to go live."},
-  {id:7,who:"Owner",title:"👑 Owner Review & Approval",desc:"Review the restaurant setup — menu, covers, addresses, brand names. Approve to proceed to Go Live.",note:"Write your approval note",alert:"Saber: APPROVED! Contact Uber Eats support or email Marco to Go Live"},
-  {id:8,who:"Saber",title:"🚀 Go Live & Marketing",desc:"Contact Uber Eats support on chat OR send email to Marco to activate the stores. Once live, start Uber Eats marketing campaigns 1 by 1.",note:"Confirm stores are live. Note marketing start date.",alert:"RESTAURANT IS LIVE! Great work team!"}
+  {id:0,who:"Nadir",title:"📦 Ship the tablet",
+   desc:"The agreement is signed. Send the tablet to the restaurant and note the tracking or courier here.",
+   note:"Courier and tracking number",
+   alert:"Saber: create the stores on Uber Eats and DoorDash"},
+  {id:1,who:"Saber",title:"🏪 Create the stores",
+   desc:"Create a store for every brand the restaurant selected, on Uber Eats and on DoorDash, at their address.",
+   note:"Confirm the stores are created — list the brands you opened",
+   alert:"Saber: send the store names to Marco"},
+  {id:2,who:"Saber",title:"📋 Send the names to Marco",
+   desc:"Send Marco the list of store names and phone numbers to change on Uber Eats.",
+   note:"Confirm the list is sent to Marco",
+   alert:"Saber: integrate the stores in UrbanPiper"},
+  {id:3,who:"Saber",title:"🔗 UrbanPiper integration",
+   desc:"Integrate every store of this restaurant in UrbanPiper and check each brand is connected.",
+   note:"Confirm all stores are connected in UrbanPiper",
+   alert:"Create the Prime login — last step"},
+  {id:4,who:"Saber",title:"🔑 Create the Prime login",
+   desc:"Create the UrbanPiper Prime email and password, then save them on this restaurant card. The sales team needs them to walk the restaurant through the tablet.",
+   note:"Confirm the Prime credentials are saved on the card above",
+   alert:"This restaurant is live"}
 ];
-var STEP_LABELS=["Find Store","Fix Address","Contact Ritik","Send Marco","UrbanPiper","Menus","Covers","Review","Live 🚀"];
-var STEP_PILLS=["pill-new","pill-tablet","pill-onboard","pill-onboard","pill-integration","pill-menu","pill-optimization","pill-owner","pill-live"];
+var STEP_LABELS=["Tablet","Stores","Marco","UrbanPiper","Prime login","Live 🚀"];
+var STEP_PILLS=["pill-tablet","pill-onboard","pill-onboard","pill-integration","pill-menu","pill-live"];
 
 // ==========================================
 // STATE
@@ -668,9 +685,9 @@ function buildNav(){
     {id:'reportcalc',ico:'tablet',label:'Report Calculator'},
     {id:'reportsend',ico:'bell',label:'Send Weekly Reports'},
     {sec:t('team')},
-    {sec:'Support'},
-    {id:'resources',ico:'file',label:'Resources'},
-    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
+    {sec:t('support')},
+    {id:'resources',ico:'file',label:t('resources')},
+    {id:'tickets',ico:'bell',label:t('tickets'),ticketBadge:true},
     {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
     {id:'team',ico:'users',label:t('team')},
@@ -681,9 +698,9 @@ function buildNav(){
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'My Work'},
     {id:'pipeline',ico:'list',label:t('my_restos')},
-    {sec:'Support'},
-    {id:'resources',ico:'file',label:'Resources'},
-    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
+    {sec:t('support')},
+    {id:'resources',ico:'file',label:t('resources')},
+    {id:'tickets',ico:'bell',label:t('tickets'),ticketBadge:true},
     {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -694,9 +711,9 @@ function buildNav(){
     {id:'leads',ico:'tablet',label:'My Leads'},
     {id:'wallet',ico:'tablet',label:'My Wallet'},
     {id:'tablet',ico:'tablet',label:t('tablet')},
-    {sec:'Support'},
-    {id:'resources',ico:'file',label:'Resources'},
-    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
+    {sec:t('support')},
+    {id:'resources',ico:'file',label:t('resources')},
+    {id:'tickets',ico:'bell',label:t('tickets'),ticketBadge:true},
     {sec:''},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -1052,7 +1069,7 @@ function renderAdd(){
     +'<div class="chip" onclick="this.classList.toggle(\'sel\')" data-val="DoorDash">DoorDash</div>'
     +'<div class="chip" onclick="this.classList.toggle(\'sel\')" data-val="Skip">Skip</div>'
     +'</div></div>'
-    +'<div class="field"><label>Assign onboarding agent</label><select id="f-agent"><option value="Saber">Saber</option><option value="Zayd">Zayd</option></select></div>'
+    +'<div class="field"><label>Assign onboarding agent</label><select id="f-agent"><option value="Saber">Saber</option><option value="Nadir">Nadir</option></select></div>'
     +'<div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Anything the team should know…"></textarea></div>'
     +'<button class="btn btn-primary btn-full" onclick="submitRestaurant()" id="btn-add" style="margin-top:8px;">✅ Submit & notify team</button>'
     +'</div></div>'
@@ -1110,7 +1127,7 @@ function renderPipeline(){
     '<div class="tbl-wrap"><table><thead><tr><th>Restaurant</th><th>Owner</th><th>Agent</th><th>Progress</th><th>Added</th>'+(CU.role==='owner'?'<th></th>':'')+'</tr></thead><tbody>'
     +list.map(function(r){
       var s=r.stepIndex||0;
-      var pct=Math.round((s/6)*100);
+      var pct=Math.round((s/STEPS.length)*100);
       var pill=r.status==='live'?'pill-live':(STEP_PILLS[s]||'pill-new');
       var lbl=r.status==='live'?'✓ Live':(STEP_LABELS[s]||'New');
       return '<tr onclick="openResto(\''+r.id+'\')" style="cursor:pointer">'
@@ -1152,22 +1169,22 @@ function openResto(id){
   var step=r.stepIndex||0;
   var notes=r.stepNotes||{};
   var currentStepDef=STEPS[step]||{};
-  var isMyStep=CU.role==='owner'||(CU.name==='Saber'&&currentStepDef.who==='Saber')||(CU.name==='Zayd'&&currentStepDef.who==='Zayd');
+  var isMyStep=CU.role==='owner'||(CU.name==='Saber'&&currentStepDef.who==='Saber');
 
   var stepsHtml=STEPS.map(function(s,i){
     var done=i<step;
     var cur=i===step&&r.status!=='live';
     var locked=i>step;
     var noteVal=notes[i]||'';
-    var whoColor=s.who==='Zayd'?'#92400E':s.who==='Owner'?'#4338CA':'var(--brand-text)';
-    var whoBg=s.who==='Zayd'?'var(--amber-light)':s.who==='Owner'?'#EEF2FF':'var(--brand-light)';
+    var whoColor=s.who==='Nadir'?'#4338CA':'var(--brand-text)';
+    var whoBg=s.who==='Nadir'?'#EEF2FF':'var(--brand-light)';
     var whoTag='<span style="font-size:10px;font-weight:700;background:'+whoBg+';color:'+whoColor+';padding:2px 7px;border-radius:20px;margin-left:6px;">'+s.who+'</span>';
     var cls='ck-step'+(done?' done':cur?' cur':'');
     var noteHtml='';
     if(done&&noteVal){
       noteHtml='<div style="margin-top:6px;font-size:11px;background:rgba(0,0,0,.04);border-radius:6px;padding:6px 8px;color:var(--gray-600);">📝 '+esc(noteVal)+'</div>';
     }
-    var canDoThis=CU.role==='owner'||(CU.name==='Saber'&&s.who==='Saber')||(CU.name==='Zayd'&&s.who==='Zayd');
+    var canDoThis=CU.role==='owner'||(CU.name==='Saber'&&s.who==='Saber')||(s.who==='Nadir'&&CU.role==='owner');
     if(cur&&r.status!=='live'){
       if(canDoThis){
         noteHtml='<div style="margin-top:8px;">'
@@ -1187,7 +1204,7 @@ function openResto(id){
       +'</div></div>';
   }).join('');
 
-  var pct=Math.round((step/9)*100);
+  var pct=Math.round((step/STEPS.length)*100);
   document.getElementById('mr-title').textContent=r.name;
   document.getElementById('mr-body').innerHTML=
     '<div class="drow"><div class="dlbl">Owner</div><div class="dval">'+esc(r.ownerName)+'</div></div>'
@@ -1198,7 +1215,7 @@ function openResto(id){
     +credBlock(r)
     +'<div class="divider"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-    +'<div style="font-size:13px;font-weight:700;">Step '+(Math.min(step+1,9))+' of 9'+(r.status==='live'?' <span class=\"pill pill-live\">✓ LIVE</span>':'')+'</div>'
+    +'<div style="font-size:13px;font-weight:700;">Step '+(Math.min(step+1,STEPS.length))+' of '+STEPS.length+(r.status==='live'?' <span class=\"pill pill-live\">✓ LIVE</span>':'')+'</div>'
     +'<div style="font-size:13px;font-weight:700;color:var(--brand);">'+pct+'%</div></div>'
     +'<div style="height:6px;background:var(--gray-100);border-radius:3px;margin-bottom:16px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:3px;"></div></div>'
     +'<div class="checklist">'+stepsHtml+'</div>'
@@ -1439,7 +1456,7 @@ function buildWalletCard(lead, tablet, rest){
     onboardStatus='LIVE ✓'; onboardColor='#059669'; onboardIcon='🚀';
   } else {
     var s=rest.stepIndex||0;
-    onboardStatus='Onboarding: '+(STEP_LABELS[s]||'Step '+s)+' ('+Math.round((s/8)*100)+'%)';
+    onboardStatus='Onboarding: '+(STEP_LABELS[s]||'Step '+s)+' ('+Math.round((s/STEPS.length)*100)+'%)';
     onboardColor='var(--brand)'; onboardIcon='⚙️';
   }
 
@@ -2836,7 +2853,7 @@ function addAITyping(){
 
 function removeTyping(){var t=document.getElementById('ai-typing');if(t)t.remove();}
 
-var BRANCHEF_SYSTEM='You are the BranChef HQ AI assistant. BranChef is a virtual brand management company based in Montreal, Canada. It places multiple virtual brands inside physical restaurant locations and collects weekly commissions on delivery platform payouts (mainly Uber Eats, some DoorDash). The onboarding team consists of Saber (does most steps) and Zayd (UrbanPiper integration only). The 9-step onboarding process is: 1) Find empty Uber Eats store, 2) Fix address & pickup instructions, 3) Prepare Marco list & contact Ritik, 4) Ritik says DONE - send list to Marco, 5) Zayd does UrbanPiper integration, 6) Menu setup (language/prices/photos), 7) Update covers & mark Ready, 8) Owner review & approval, 9) Go Live & marketing. Sales team handles tablet requests. Owners (Nadir/Simo) can see everything and approve at step 8. You can also help write messages, emails, explain steps, translate things, or help with any work task. Answer questions about the platform, steps, team roles, or anything work-related. Be concise and friendly. If asked in French, answer in French.';
+var BRANCHEF_SYSTEM='You are the BranChef HQ AI assistant. BranChef is a virtual brand management company based in Montreal, Canada. It places multiple virtual brands inside physical restaurant locations and collects weekly commissions on delivery platform payouts (mainly Uber Eats, some DoorDash). Onboarding is handled by Saber, with Nadir shipping the tablet. After the agreement is signed the steps are: 1) Nadir ships the tablet, 2) Saber creates the stores on Uber Eats and DoorDash, 3) Saber sends the store names to Marco, 4) Saber integrates the stores in UrbanPiper, 5) the UrbanPiper Prime login is created and saved on the restaurant card — then the restaurant is live.';
 
 function sendAI(){
   var input=document.getElementById('ai-input');
@@ -2861,18 +2878,13 @@ function getBranChefAIReply(msg){
 
   // Steps questions
   if(/step|étape|onboard|process|processus/.test(m)){
-    if(isFr)return 'Le processus d\'intégration BranChef comporte 9 étapes:\n1. 🔍 Trouver le store Uber Eats vide\n2. 📍 Corriger l\'adresse & instructions de collecte\n3. 📋 Préparer la liste Marco + contacter Ritik\n4. ✅ Ritik dit DONE → envoyer liste à Marco\n5. 🔗 Intégration UrbanPiper (Zayd)\n6. 🍔 Configuration des menus\n7. 🎨 Mise à jour des covers + marquer Prêt\n8. 👑 Validation par Nadir/Simo\n9. 🚀 Go Live + Marketing';
-    return 'The BranChef onboarding has 9 steps:\n1. 🔍 Find the empty Uber Eats store\n2. 📍 Fix address & pickup instructions\n3. 📋 Prepare Marco list & contact Ritik\n4. ✅ Ritik says DONE → send list to Marco\n5. 🔗 UrbanPiper integration (Zayd)\n6. 🍔 Menu setup (language/prices/photos)\n7. 🎨 Update covers & mark Ready\n8. 👑 Owner review (Nadir/Simo)\n9. 🚀 Go Live & Marketing';
+    if(isFr)return 'Le processus d\'intégration BranChef comporte 5 étapes:\n1. 📦 Nadir envoie la tablette\n2. 🏪 Saber crée les stores (Uber Eats + DoorDash)\n3. 📋 Envoyer les noms à Marco\n4. 🔗 Intégration UrbanPiper\n5. 🔑 Créer le compte Prime → En ligne';
+    return 'The BranChef onboarding has 5 steps:\n1. 📦 Nadir ships the tablet\n2. 🏪 Saber creates the stores (Uber Eats + DoorDash)\n3. 📋 Send the names to Marco\n4. 🔗 UrbanPiper integration\n5. 🔑 Create the Prime login → Live';
   }
   // Saber role
   if(/saber/.test(m)){
-    if(isFr)return 'Saber est responsable de presque toutes les étapes : trouver les stores, corriger les adresses, contacter Ritik et Marco, configurer les menus, mettre à jour les covers et gérer le Go Live. Il a accès à tout sauf UrbanPiper.';
-    return 'Saber handles almost everything: finding stores, fixing addresses, contacting Ritik & Marco, menu setup, updating covers, and Go Live. He has access to everything except UrbanPiper.';
-  }
-  // Zayd role
-  if(/zayd/.test(m)){
-    if(isFr)return 'Zayd est spécialisé dans l\'intégration UrbanPiper (étape 5). C\'est lui qui connecte les stores Uber Eats à UrbanPiper après que Ritik confirme que c\'est prêt.';
-    return 'Zayd specializes in UrbanPiper integration (step 5). He connects the Uber Eats stores to UrbanPiper after Ritik confirms they are ready.';
+    if(isFr)return 'Saber gère toutes les étapes après l\'envoi de la tablette : créer les stores sur Uber Eats et DoorDash, envoyer les noms à Marco, l\'intégration UrbanPiper et la création du compte Prime et gérer le Go Live. Il a accès à tout sauf UrbanPiper.';
+    return 'Saber handles almost everything: finding stores, fixing addresses, contacting Ritik & Marco, menu setup, updating covers, and Go Live. He handles every onboarding step after the tablet is shipped.';
   }
   // Ritik / Marco
   if(/ritik/.test(m)){
@@ -2885,8 +2897,8 @@ function getBranChefAIReply(msg){
   }
   // Pipeline
   if(/pipeline|restaurant|status/.test(m)){
-    if(isFr)return 'Le Pipeline montre tous les restaurants en cours d\'intégration. Chaque restaurant avance étape par étape. Saber et Zayd ne peuvent pas sauter d\'étape — chaque étape nécessite une note avant de passer à la suivante.';
-    return 'The Pipeline shows all restaurants being onboarded. Each restaurant moves step by step. Saber and Zayd cannot skip steps — each step requires a written note before advancing.';
+    if(isFr)return 'Le Pipeline montre tous les restaurants en cours d\'intégration. Chaque restaurant avance étape par étape. Saber ne peut pas sauter d\'étape — chaque étape nécessite une note avant de passer à la suivante.';
+    return 'The Pipeline shows all restaurants being onboarded. Each restaurant moves step by step. Saber cannot skip steps — each step requires a written note before advancing.';
   }
   // Tablet
   if(/tablet|tablette/.test(m)){
@@ -2925,8 +2937,8 @@ function getBranChefAIReply(msg){
   }
   // Urbanpiper
   if(/urbanpiper|urban piper/.test(m)){
-    if(isFr)return 'UrbanPiper est le logiciel tiers qui connecte les menus BranChef à Uber Eats. C\'est Zayd qui gère cette intégration (étape 5). Il reçoit la liste des stores de Saber et les connecte dans UrbanPiper.';
-    return 'UrbanPiper is the third-party software that connects BranChef menus to Uber Eats. Zayd handles this integration (step 5). He receives the store list from Saber and connects them in UrbanPiper.';
+    if(isFr)return 'UrbanPiper est le logiciel tiers qui connecte les menus BranChef à Uber Eats. C\'est Saber qui gère cette intégration (étape 4). Il reçoit la liste des stores de Saber et les connecte dans UrbanPiper.';
+    return 'UrbanPiper is the third-party software that connects BranChef menus to Uber Eats. Saber handles this integration (step 4). He receives the store list from Saber and connects them in UrbanPiper.';
   }
   // Hello / greeting
   if(/^(hi|hello|hey|bonjour|salut|yo|sup|hola)/.test(m)){
@@ -2935,8 +2947,8 @@ function getBranChefAIReply(msg){
   }
   // Help
   if(/help|aide|comment|how/.test(m)){
-    if(isFr)return 'Je peux vous aider avec :\n• Les 9 étapes d\'intégration\n• Les rôles de Saber, Zayd, Ritik, Marco\n• Comment fonctionne le Pipeline\n• Les demandes de tablette\n• Le pointage\n• Rédiger des messages ou emails\n• Tout ce qui concerne BranChef !';
-    return 'I can help you with:\n• The 9 onboarding steps\n• Roles of Saber, Zayd, Ritik, Marco\n• How the Pipeline works\n• Tablet requests\n• Clock In/Out\n• Writing messages or emails\n• Anything BranChef related!';
+    if(isFr)return 'Je peux vous aider avec :\n• Les 5 étapes d\'intégration\n• Les rôles de Saber, Nadir, Marco\n• Comment fonctionne le Pipeline\n• Les demandes de tablette\n• Le pointage\n• Rédiger des messages ou emails\n• Tout ce qui concerne BranChef !';
+    return 'I can help you with:\n• The 5 onboarding steps\n• Roles of Saber, Nadir, Marco\n• How the Pipeline works\n• Tablet requests\n• Clock In/Out\n• Writing messages or emails\n• Anything BranChef related!';
   }
   // Default
   if(isFr)return 'Bonne question ! Je suis spécialisé dans BranChef — les étapes d\'intégration, les rôles de l\'équipe, le pipeline, les tablettes et le pointage. Pouvez-vous reformuler votre question en lien avec BranChef ?';
