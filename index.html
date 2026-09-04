@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090302">
+<meta name="bc-version" content="2026090401">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -817,6 +817,7 @@ function startApp(){
   startClock();
   updatePresence();
   loadData();
+  startSync();
   // Apply language
   applyLangUI();
   var tl=document.getElementById('topbar-lang');
@@ -1137,6 +1138,7 @@ function renderDashActivity(){
   var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'📢'};
   // Filter notifications by role
   var filtered=notifs.filter(function(n){
+    if(n.to&&n.to.indexOf(CU.name)>=0)return true;
     if(CU.role==='owner')return true;
     if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name)||(n.type==='new'&&n.message&&n.message.indexOf(CU.name)>=0);
@@ -1724,7 +1726,7 @@ function renderLeadsSales(){
 
   var sc={ sending:'…', send_failed:'⚠️ Agreement did not send — tell Nadir',
            viewed:'👀 Opened the agreement',
-           pending:t('st_sent'), pending_approval:t('st_sent'), signed:t('st_signed'),
+           pending:t('st_sent'), pending_approval:t('st_signed'), signed:t('st_signed'),
            approved:t('st_signed'), shipped:t('st_shipped'), live:t('st_live'), rejected:t('st_rejected') };
   var cc={ sending:'#807E8C', send_failed:'#DC2626', viewed:'#2563EB',
            pending:'#B45309', pending_approval:'#B45309', signed:'#1D4ED8',
@@ -1883,6 +1885,7 @@ var ICONS={new:'🏪',live:'🚀',tablet:'📦',step:'✅',clock:'⏱',system:'�
 
 function renderNotifications(){
   var filtered=notifs.filter(function(n){
+    if(n.to&&n.to.indexOf(CU.name)>=0)return true;
     if(CU.role==='owner')return true;
     if(CU.role==='onboarding')return (n.type==='step'&&n.createdBy===CU.name)||(n.type==='live'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name);
     if(CU.role==='sales')return (n.type==='tablet'&&n.createdBy===CU.name)||(n.type==='clock'&&n.createdBy===CU.name)||(n.type==='new'&&n.message&&n.message.indexOf(CU.name)>=0);
@@ -3146,12 +3149,78 @@ function timeAgo(ts){if(!ts)return'';var d=ts.toDate?ts.toDate():new Date(ts);va
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},3000);}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ==========================================
+// DOCUSIGN SYNC
+// DocuSign never calls us, so we ask it instead - every 60 seconds,
+// from whoever has the app open. Works on any DocuSign plan.
+// ==========================================
+var DS_MAP={delivered:'viewed',completed:'pending_approval',declined:'rejected',voided:'rejected'};
+var DS_OPEN=['sending','pending','viewed'];   // only these may be overwritten
+
+function syncEnvelopes(){
+  if(!CU||!db||!leads.length)return;
+  fetch('/api/check-envelopes')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!d.ok)return;
+      var live={};
+      d.envelopes.forEach(function(e){live[e.envelopeId]=e;});
+      leads.forEach(function(l){
+        if(!l.envelopeId)return;
+        var e=live[l.envelopeId];
+        if(!e)return;
+        var next=DS_MAP[e.status];
+        if(!next||next===l.status)return;
+        if(DS_OPEN.indexOf(l.status)<0)return;   // already approved / shipped / live
+        var upd={status:next,docusignStatus:e.status};
+        if(e.completedAt)upd.signedAt=e.completedAt;
+        if(next==='rejected')upd.rejectReason='Declined in DocuSign';
+        db.collection('leads').doc(l.id).update(upd)
+          .then(function(){notifyLead(l,next);})
+          .catch(function(){});
+      });
+    })
+    .catch(function(){});
+}
+
+function notifyLead(l,next){
+  var who=l.restaurantName||'A restaurant';
+  var msg,to,type;
+  if(next==='viewed'){
+    msg='\uD83D\uDC40 '+who+' opened the agreement';
+    to=[l.submittedBy]; type='new';
+  }else if(next==='pending_approval'){
+    msg='\u270D\uFE0F '+who+' signed the agreement - tablet and setup can start';
+    to=[l.submittedBy,'Nadir','Saber','Simo']; type='new';
+  }else{
+    msg='\u274C '+who+' declined the agreement';
+    to=[l.submittedBy,'Nadir','Simo']; type='system';
+  }
+  var ref=db.collection('notifications').doc(l.id+'_'+next);
+  ref.get().then(function(s){
+    if(s.exists)return;   // another browser already wrote it
+    ref.set({
+      type:type, message:msg, to:to.filter(Boolean),
+      read:false, createdBy:l.submittedBy,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).catch(function(){});
+}
+
+function startSync(){
+  setTimeout(syncEnvelopes,3000);          // let leads load first
+  setInterval(syncEnvelopes,60000);
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden)syncEnvelopes();
+  });
+}
 </script>
 
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090302';
+  var CURRENT = '2026090401';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
