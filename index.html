@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090201">
+<meta name="bc-version" content="2026090301">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,6 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
@@ -606,7 +607,7 @@ window.addEventListener('load',function(){
     auth.onAuthStateChanged(function(u){
       document.getElementById('loading').style.display='none';
       if(u&&TEAM[u.email]){
-      currentUser=u;CU=TEAM[u.email];startApp();
+      currentUser=u;CU=Object.assign({email:u.email},TEAM[u.email]);startApp();
     }else if(u&&!TEAM[u.email]){
       // User exists in Firebase but removed from team — force sign out
       auth.signOut();
@@ -668,6 +669,10 @@ function buildNav(){
     {id:'reportcalc',ico:'tablet',label:'Report Calculator'},
     {id:'reportsend',ico:'bell',label:'Send Weekly Reports'},
     {sec:t('team')},
+    {sec:'Support'},
+    {id:'resources',ico:'file',label:'Resources'},
+    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
+    {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
     {id:'team',ico:'users',label:t('team')},
     {id:'admin',ico:'settings',label:t('admin')},
@@ -677,6 +682,9 @@ function buildNav(){
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'My Work'},
     {id:'pipeline',ico:'list',label:t('my_restos')},
+    {sec:'Support'},
+    {id:'resources',ico:'file',label:'Resources'},
+    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
     {sec:t('team')},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -687,6 +695,9 @@ function buildNav(){
     {id:'leads',ico:'tablet',label:'My Leads'},
     {id:'wallet',ico:'tablet',label:'My Wallet'},
     {id:'tablet',ico:'tablet',label:t('tablet')},
+    {sec:'Support'},
+    {id:'resources',ico:'file',label:'Resources'},
+    {id:'tickets',ico:'bell',label:'Tickets',ticketBadge:true},
     {sec:''},
     {id:'clock',ico:'clock',label:t('clock')},
   ];
@@ -705,10 +716,11 @@ function buildNav(){
     html+='<button class="sb-item'+(item.id===activeId?' active':'')+'" id="nav-'+item.id+'" onclick="showPage(\''+item.id+'\',this)">'
       +svgIcon(item.ico)+item.label
       +(item.badge?'<span class="sb-badge" id="notif-badge" style="display:none">0</span>':'')
+      +(item.ticketBadge?'<span class="sb-badge" id="ticket-badge" style="display:none">0</span>':'')
       +'</button>';
   });
   var nav=document.getElementById('sb-nav');
-  if(nav){nav.innerHTML=html; updateBadge();}
+  if(nav){nav.innerHTML=html; updateBadge(); updateTicketBadge();}
 }
 
 function svgIcon(name){
@@ -753,7 +765,9 @@ function showPage(name,btn){
     notifications:renderNotifications,
     clock:renderClock,
     team:renderTeam,
-    admin:renderAdmin
+    admin:renderAdmin,
+    resources:renderResources,
+    tickets:renderTickets
   };
   var c=document.getElementById('content');
   c.innerHTML='';
@@ -823,6 +837,7 @@ function loadData(){
     tablets=[];s.forEach(function(d){tablets.push(Object.assign({id:d.id},d.data()));});
     refreshCurrentPage();
   });
+  watchResources(); watchTickets();
   db.collection('notifications').orderBy('createdAt','desc').limit(60).onSnapshot(function(s){
     notifs=[];s.forEach(function(d){notifs.push(Object.assign({id:d.id},d.data()));});
     updateBadge();
@@ -1181,6 +1196,7 @@ function openResto(id){
     +'<div class="drow"><div class="dlbl">Address</div><div class="dval">'+esc(r.address)+'</div></div>'
     +'<div class="drow"><div class="dlbl">Brands</div><div class="dval" style="font-size:12px;line-height:1.6;">'+(r.brands||[]).join(' · ')+'</div></div>'
     +(r.notes?'<div class="drow"><div class="dlbl">Notes</div><div class="dval">'+esc(r.notes)+'</div></div>':'')
+    +credBlock(r)
     +'<div class="divider"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
     +'<div style="font-size:13px;font-weight:700;">Step '+(Math.min(step+1,9))+' of 9'+(r.status==='live'?' <span class=\"pill pill-live\">✓ LIVE</span>':'')+'</div>'
@@ -1700,6 +1716,321 @@ function updateBadge(){
 
 function addNotif(type,msg){
   db.collection('notifications').add({type:type,message:msg,read:false,createdBy:CU.name,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+}
+
+
+// ==========================================
+// RESOURCES  ·  fiches techniques + links
+// Nadir and Saber upload, everyone downloads.
+// ==========================================
+var BRANDS_FICHE=[
+  {cat:'Burgers & Smash', items:['Smash Meat','Blend Burger','FPL Burger','Smash Burger & Fries','Fat Smash','Toast Burger']},
+  {cat:'Sandwich · Chicken · Street', items:['Smash Dwich',"Let's Chicken",'Big Tacos','Dogzilla','Panini House','Philly Pappi']},
+  {cat:'Poutine · Pizza · Calzone', items:['Poutine Mafia','Poutine Palace','Hoot Calzones','Bella Ciao Pizza','Pizza Bomb']},
+  {cat:'Middle East & Mediterranean', items:['Mr Ghanoush','Shawarman']}
+];
+var fiches={}, links={}, fichesReady=false;
+
+function canManage(){ return CU && (CU.role==='owner' || CU.role==='onboarding'); }
+function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+
+function watchResources(){
+  db.collection('resources').doc('fiches').onSnapshot(function(d){
+    fiches = d.exists ? (d.data().files||{}) : {};
+    fichesReady = true;
+    var a=document.querySelector('.sb-item.active');
+    if(a && a.id==='nav-resources') renderResources();
+  });
+  db.collection('resources').doc('links').onSnapshot(function(d){
+    links = d.exists ? (d.data().items||{}) : {};
+    var a=document.querySelector('.sb-item.active');
+    if(a && a.id==='nav-resources') renderResources();
+  });
+}
+
+function renderResources(){
+  var manage=canManage();
+  var html='<div class="page-hdr"><h2>Resources</h2><p>Kitchen sheets and the links you send to restaurants.</p></div>';
+
+  // ---- links the sales team sends out ----
+  var payLink=links.payment||'';
+  html+='<div class="card" style="margin-bottom:1.25rem"><div style="padding:1.25rem">'
+    +'<h3 style="margin:0 0 .35rem;font-size:1rem">Payment details form</h3>'
+    +'<p style="margin:0 0 .9rem;color:var(--gray-600);font-size:.85rem">Send this to a restaurant once the tablet is with them, so they can fill in how they get paid.</p>';
+  if(payLink){
+    html+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">'
+      +'<input id="pay-link" readonly value="'+esc(payLink)+'" style="flex:1;min-width:240px;padding:.6rem .75rem;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;background:var(--gray-50)">'
+      +'<button class="btn" onclick="copyLink()">Copy link</button>'
+      +'<a class="btn btn-ghost" href="'+esc(payLink)+'" target="_blank" rel="noopener">Open</a>'
+      +(manage?'<button class="btn btn-ghost" onclick="editPayLink()">Edit</button>':'')
+      +'</div>';
+  } else {
+    html+= manage
+      ? '<button class="btn" onclick="editPayLink()">Add the link</button>'
+      : '<p style="color:var(--gray-500);font-size:.85rem;margin:0">Not added yet.</p>';
+  }
+  html+='</div></div>';
+
+  // ---- fiches techniques ----
+  html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1.1rem">Fiches techniques</h2>'
+    +'<p>One sheet per brand, English and French. Download and send to the restaurant.</p></div>';
+
+  if(!fichesReady){
+    html+='<div class="card"><div style="padding:2rem;text-align:center;color:var(--gray-500)">Loading…</div></div>';
+  } else {
+    BRANDS_FICHE.forEach(function(g){
+      html+='<div class="card" style="margin-bottom:1rem"><div style="padding:1rem 1.25rem;border-bottom:1px solid var(--gray-100)">'
+        +'<strong style="font-size:.9rem">'+esc(g.cat)+'</strong></div><div style="padding:.35rem 0">';
+      g.items.forEach(function(b){
+        var k=slug(b), en=fiches[k+'|en'], fr=fiches[k+'|fr'];
+        html+='<div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;border-bottom:1px solid var(--gray-50);flex-wrap:wrap">'
+          +'<div style="flex:1;min-width:150px;font-size:.88rem;font-weight:600">'+esc(b)+'</div>'
+          +fileChip(k,'en',en,manage)
+          +fileChip(k,'fr',fr,manage)
+          +'</div>';
+      });
+      html+='</div></div>';
+    });
+    if(manage){
+      html+='<div class="card" style="border:2px dashed var(--gray-200);background:var(--gray-50)">'
+        +'<div id="fiche-drop" style="padding:1.75rem;text-align:center;cursor:pointer"'
+        +' ondragover="event.preventDefault();this.style.background=\'#EEF\'"'
+        +' ondragleave="this.style.background=\'\'"'
+        +' ondrop="dropFiches(event)" onclick="document.getElementById(\'fiche-input\').click()">'
+        +'<div style="font-size:1.5rem;margin-bottom:.35rem">📄</div>'
+        +'<div style="font-weight:700;font-size:.9rem">Drop the PDFs here</div>'
+        +'<div style="color:var(--gray-600);font-size:.8rem;margin-top:.35rem">'
+        +'Name them <code>brand-en.pdf</code> or <code>brand-fr.pdf</code> — for example <code>smash-meat-en.pdf</code>.<br>'
+        +'Drop as many as you like at once; anything that doesn\'t match a brand is listed back to you.</div>'
+        +'<input type="file" id="fiche-input" accept="application/pdf" multiple style="display:none" onchange="dropFiches(event)">'
+        +'</div><div id="fiche-log" style="padding:0 1.25rem 1rem"></div></div>';
+    }
+  }
+  document.getElementById('content').innerHTML=html;
+}
+
+function fileChip(k,lang,f,manage){
+  var label=lang.toUpperCase();
+  if(f){
+    return '<a class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.78rem" href="'+esc(f.url)+'" target="_blank" rel="noopener" download>'
+      +label+' ↓</a>'
+      +(manage?'<button class="btn btn-ghost" style="padding:.35rem .5rem;font-size:.78rem;color:var(--red,#DC2626)" onclick="delFiche(\''+k+'\',\''+lang+'\')">✕</button>':'');
+  }
+  return '<span style="padding:.35rem .7rem;font-size:.78rem;color:var(--gray-400);border:1.5px dashed var(--gray-200);border-radius:8px">'+label+' —</span>';
+}
+
+function copyLink(){
+  var i=document.getElementById('pay-link'); if(!i) return;
+  navigator.clipboard.writeText(i.value).then(function(){ toastMsg('Link copied'); });
+}
+function editPayLink(){
+  var v=prompt('Paste the payment-details form link:', links.payment||'');
+  if(v===null) return;
+  db.collection('resources').doc('links').set({items:Object.assign({},links,{payment:v.trim()})},{merge:true});
+}
+
+// PDFs live in Firebase Storage; Firestore just holds the index
+async function dropFiches(ev){
+  ev.preventDefault();
+  var el=document.getElementById('fiche-drop'); if(el) el.style.background='';
+  var list = ev.dataTransfer ? ev.dataTransfer.files : ev.target.files;
+  if(!list || !list.length) return;
+  var log=document.getElementById('fiche-log');
+  var known={};
+  BRANDS_FICHE.forEach(function(g){ g.items.forEach(function(b){ known[slug(b)]=b; }); });
+
+  var done=0, skipped=[], total=list.length;
+  function say(t){ if(log) log.innerHTML='<div style="font-size:.82rem;color:var(--gray-600)">'+t+'</div>'; }
+  say('Uploading 0 of '+total+'…');
+
+  for(var i=0;i<list.length;i++){
+    var f=list[i];
+    var name=f.name.replace(/\.pdf$/i,'');
+    var m=name.match(/^(.*)[-_ ](en|fr)$/i);
+    if(!m || !known[slug(m[1])]){ skipped.push(f.name); continue; }
+    var k=slug(m[1]), lang=m[2].toLowerCase();
+    try{
+      var ref=firebase.storage().ref('fiches/'+k+'-'+lang+'.pdf');
+      await ref.put(f, {contentType:'application/pdf'});
+      var url=await ref.getDownloadURL();
+      var next={}; next[k+'|'+lang]={url:url, name:f.name, by:CU.name, at:Date.now()};
+      await db.collection('resources').doc('fiches').set(
+        {files:Object.assign({},fiches,next)},{merge:true});
+      fiches=Object.assign({},fiches,next);
+      done++; say('Uploading '+done+' of '+total+'…');
+    }catch(e){ skipped.push(f.name+' — '+(e.message||'failed')); }
+  }
+  renderResources();
+  var log2=document.getElementById('fiche-log');
+  if(log2){
+    log2.innerHTML='<div style="font-size:.82rem"><strong>'+done+' uploaded.</strong>'
+      +(skipped.length?'<div style="margin-top:.4rem;color:#B45309">Not matched to a brand:<br>'+skipped.map(esc).join('<br>')
+        +'<div style="margin-top:.3rem;color:var(--gray-600)">Rename them like <code>smash-meat-en.pdf</code> and drop again.</div></div>':'')
+      +'</div>';
+  }
+  if(done) addNotif('resource', CU.name+' uploaded '+done+' fiche'+(done===1?'':'s')+' technique');
+}
+
+function delFiche(k,lang){
+  if(!confirm('Remove this sheet?')) return;
+  var next=Object.assign({},fiches); delete next[k+'|'+lang];
+  db.collection('resources').doc('fiches').set({files:next});
+  firebase.storage().ref('fiches/'+k+'-'+lang+'.pdf').delete().catch(function(){});
+}
+
+// ==========================================
+// TICKETS
+// ==========================================
+var TICKET_TYPES=[
+  'Tablet not working',
+  'Restaurant wants to speak with sales',
+  'Payment problem',
+  'Restaurant wants to change prices',
+  'Menu / item problem',
+  'Restaurant wants to drop a brand',
+  'Restaurant not answering',
+  'Other'
+];
+var tickets=[];
+
+function watchTickets(){
+  db.collection('tickets').orderBy('createdAt','desc').limit(120).onSnapshot(function(s){
+    tickets=[]; s.forEach(function(d){ tickets.push(Object.assign({id:d.id},d.data())); });
+    updateTicketBadge();
+    var a=document.querySelector('.sb-item.active');
+    if(a && a.id==='nav-tickets') renderTickets();
+  });
+}
+function myTickets(){
+  return canManage() ? tickets : tickets.filter(function(t){ return t.byEmail===CU.email; });
+}
+function updateTicketBadge(){
+  var open=myTickets().filter(function(t){ return t.status!=='closed'; }).length;
+  var b=document.getElementById('ticket-badge');
+  if(!b) return;
+  if(open>0){ b.style.display=''; b.textContent=open>9?'9+':open; } else b.style.display='none';
+}
+
+function renderTickets(){
+  var list=myTickets();
+  var open=list.filter(function(t){return t.status!=='closed';});
+  var closed=list.filter(function(t){return t.status==='closed';});
+  var html='<div class="page-hdr"><h2>Tickets</h2><p>'
+    +(canManage()?'Everything the team has raised.':'Problems you have raised.')+'</p></div>'
+    +'<div style="margin-bottom:1.25rem"><button class="btn" onclick="newTicket()">+ New ticket</button></div>';
+
+  html+= open.length
+    ? '<div class="card" style="margin-bottom:1.25rem">'+open.map(ticketRow).join('')+'</div>'
+    : '<div class="card"><div class="empty" style="padding:2.5rem"><div class="empty-ico">✅</div><p>Nothing open right now</p></div></div>';
+
+  if(closed.length){
+    html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1rem">Closed</h2></div>'
+      +'<div class="card" style="opacity:.65">'+closed.slice(0,25).map(ticketRow).join('')+'</div>';
+  }
+  document.getElementById('content').innerHTML=html;
+}
+
+function ticketRow(t){
+  var age=t.createdAt&&t.createdAt.toDate?timeAgo(t.createdAt.toDate()):'';
+  var col=t.status==='closed'?'var(--gray-400)':(t.status==='working'?'#2563EB':'#D97706');
+  return '<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--gray-100)">'
+    +'<div style="display:flex;gap:.75rem;align-items:flex-start;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:200px">'
+        +'<div style="font-weight:700;font-size:.9rem">'+esc(t.type||'Ticket')
+          +(t.restaurant?' <span style="font-weight:500;color:var(--gray-600)">· '+esc(t.restaurant)+'</span>':'')+'</div>'
+        +(t.detail?'<div style="color:var(--gray-700);font-size:.85rem;margin-top:.35rem;white-space:pre-wrap">'+esc(t.detail)+'</div>':'')
+        +'<div style="color:var(--gray-500);font-size:.75rem;margin-top:.45rem">'+esc(t.by||'')+' · '+age+'</div>'
+      +'</div>'
+      +'<span style="align-self:flex-start;padding:.2rem .6rem;border-radius:999px;font-size:.7rem;font-weight:700;color:#fff;background:'+col+'">'
+        +esc((t.status||'open').toUpperCase())+'</span>'
+      +(canManage()&&t.status!=='closed'
+        ? '<div style="display:flex;gap:.4rem">'
+          +(t.status!=='working'?'<button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.78rem" onclick="setTicket(\''+t.id+'\',\'working\')">Working on it</button>':'')
+          +'<button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.78rem" onclick="setTicket(\''+t.id+'\',\'closed\')">Close</button></div>'
+        : '')
+    +'</div></div>';
+}
+
+function newTicket(){
+  var opts=TICKET_TYPES.map(function(x,i){return (i+1)+'. '+x;}).join('\n');
+  var pick=prompt('What is the problem?\n\n'+opts+'\n\nType the number:');
+  if(pick===null) return;
+  var idx=parseInt(pick,10)-1;
+  if(isNaN(idx)||idx<0||idx>=TICKET_TYPES.length){ alert('Pick a number from the list.'); return; }
+  var resto=prompt('Which restaurant? (leave empty if it is not about one)','')||'';
+  var detail=prompt('Describe the problem:','')||'';
+  if(!detail.trim()){ alert('Please describe the problem so Nadir and Saber can act on it.'); return; }
+  db.collection('tickets').add({
+    type:TICKET_TYPES[idx], restaurant:resto.trim(), detail:detail.trim(),
+    status:'open', by:CU.name, byEmail:CU.email,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    addNotif('ticket', CU.name+' raised a ticket: '+TICKET_TYPES[idx]+(resto?' — '+resto:''));
+    toastMsg('Ticket sent to Nadir and Saber');
+  }).catch(function(e){ alert('Could not send the ticket: '+(e.message||e)); });
+}
+function setTicket(id,status){
+  db.collection('tickets').doc(id).update({
+    status:status, closedBy:CU.name, closedAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+// ==========================================
+// URBANPIPER PRIME CREDENTIALS
+// Nadir and Saber write them, the whole team reads them.
+// ==========================================
+function credBlock(r){
+  var c=r.piper||{};
+  var has=c.email||c.password;
+  var body = has
+    ? '<div style="display:grid;gap:.5rem">'
+      +credRow('Email', c.email||'—', 'pc-e-'+r.id)
+      +credRow('Password', c.password||'—', 'pc-p-'+r.id)
+      +'<div style="color:var(--gray-500);font-size:.72rem">'
+        +(c.by?'Set by '+esc(c.by):'')+(c.at?' · '+timeAgo(new Date(c.at)):'')+'</div>'
+      +'</div>'
+    : '<p style="color:var(--gray-500);font-size:.83rem;margin:0">Not created yet.</p>';
+  return '<div style="margin-top:1rem;padding:1rem;border:1.5px solid var(--gray-200);border-radius:10px;background:var(--gray-50)">'
+    +'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.7rem;flex-wrap:wrap">'
+      +'<strong style="font-size:.85rem">UrbanPiper Prime</strong>'
+      +'<span style="color:var(--gray-500);font-size:.75rem">the tablet login</span>'
+      +(canManage()?'<button class="btn btn-ghost" style="margin-left:auto;padding:.3rem .7rem;font-size:.78rem" onclick="editPiper(\''+r.id+'\')">'
+        +(has?'Edit':'Add')+'</button>':'')
+    +'</div>'+body+'</div>';
+}
+function credRow(label,val,id){
+  return '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">'
+    +'<span style="min-width:72px;color:var(--gray-600);font-size:.78rem;font-weight:600">'+label+'</span>'
+    +'<code id="'+id+'" style="flex:1;min-width:150px;background:#fff;border:1px solid var(--gray-200);border-radius:6px;padding:.4rem .6rem;font-size:.82rem;word-break:break-all">'+esc(val)+'</code>'
+    +'<button class="btn btn-ghost" style="padding:.3rem .6rem;font-size:.75rem" onclick="copyText(\''+id+'\')">Copy</button>'
+    +'</div>';
+}
+function copyText(id){
+  var el=document.getElementById(id); if(!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function(){ toastMsg('Copied'); });
+}
+function editPiper(rid){
+  var r=restaurants.filter(function(x){return x.id===rid;})[0]; if(!r) return;
+  var c=r.piper||{};
+  var em=prompt('UrbanPiper email for '+r.name+':', c.email||''); if(em===null) return;
+  var pw=prompt('UrbanPiper password for '+r.name+':', c.password||''); if(pw===null) return;
+  db.collection('restaurants').doc(rid).update({
+    piper:{email:em.trim(), password:pw.trim(), by:CU.name, at:Date.now()}
+  }).then(function(){
+    addNotif('piper','Prime credentials ready for '+r.name+' — set by '+CU.name);
+    toastMsg('Saved');
+    setTimeout(function(){ openResto(rid); }, 400);
+  }).catch(function(e){ alert('Could not save: '+(e.message||e)); });
+}
+
+// small helpers used above
+function toastMsg(t){
+  var d=document.createElement('div');
+  d.textContent=t;
+  d.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25)';
+  document.body.appendChild(d);
+  setTimeout(function(){ d.style.opacity='0'; d.style.transition='opacity .3s'; },1800);
+  setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },2200);
 }
 
 // ==========================================
@@ -2667,7 +2998,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090201';
+  var CURRENT = '2026090301';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
