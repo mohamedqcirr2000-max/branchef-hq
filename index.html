@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
 <meta name="bc-version" content="2026090301">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
@@ -260,6 +262,77 @@ tbody tr:hover td{background:var(--gray-50);}
   .topbar{padding:0 14px;}
   .field-row{grid-template-columns:1fr;}
 }
+
+/* ---- design refresh ------------------------------------------------
+   Tighter type, real depth on cards, a proper focus ring, and the brand
+   gradient used sparingly so it means something. */
+:root{
+  --ink:#14131A; --ink-2:#4A4856; --ink-3:#807E8C;
+  --line:#ECEAF2; --line-2:#DFDCE9;
+  --surface:#FFFFFF; --canvas:#F7F6FA;
+  --ring:0 0 0 3px rgba(155,89,255,.18);
+  --e1:0 1px 2px rgba(20,19,26,.05), 0 1px 3px rgba(20,19,26,.04);
+  --e2:0 2px 4px rgba(20,19,26,.04), 0 8px 20px rgba(20,19,26,.07);
+}
+body{background:var(--canvas);color:var(--ink);
+     font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     font-size:14px;letter-spacing:-.005em}
+h1,h2,h3{letter-spacing:-.02em}
+
+.page-hdr{margin-bottom:22px}
+.page-hdr h2{font-size:26px;font-weight:800;letter-spacing:-.03em;color:var(--ink)}
+.page-hdr p{font-size:13.5px;color:var(--ink-3);margin-top:5px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+      box-shadow:var(--e1);overflow:hidden;margin-bottom:18px;transition:box-shadow .18s}
+.card:hover{box-shadow:var(--e2)}
+.card-hdr{padding:16px 20px;border-bottom:1px solid var(--line)}
+.card-title{font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+.card-body{padding:20px}
+
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+      padding:18px 20px;box-shadow:var(--e1)}
+.stat-lbl{font-size:10.5px;font-weight:700;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}
+.stat-num{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:6px;
+          background:linear-gradient(135deg,var(--brand),var(--brand2));
+          -webkit-background-clip:text;background-clip:text;color:transparent}
+.stat-sub{font-size:12px;color:var(--ink-3);margin-top:2px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+     padding:10px 17px;border-radius:11px;font-size:13px;font-weight:600;
+     cursor:pointer;border:1.5px solid var(--line-2);background:var(--surface);
+     color:var(--ink);transition:.16s;letter-spacing:-.01em}
+.btn:hover{border-color:#C9C4DC;transform:translateY(-1px);box-shadow:var(--e1)}
+.btn:active{transform:none}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));
+             border:none;color:#fff;box-shadow:0 2px 10px rgba(155,89,255,.28)}
+.btn-primary:hover{opacity:1;filter:brightness(1.06);box-shadow:0 4px 16px rgba(155,89,255,.34)}
+
+.field label{font-size:11px;font-weight:700;color:var(--ink-2);
+             text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:7px}
+.field input,.field select,.field textarea{
+  width:100%;padding:11px 13px;border:1.5px solid var(--line-2);border-radius:11px;
+  font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);transition:.15s}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:var(--brand);box-shadow:var(--ring)}
+
+.sb-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;
+         cursor:pointer;color:var(--ink-2);font-size:13.5px;font-weight:500;
+         margin-bottom:2px;transition:.15s;border:none;background:none;width:100%;text-align:left}
+.sb-item:hover{background:var(--line);color:var(--ink)}
+.sb-item.active{background:var(--brand-light);color:var(--brand-text);font-weight:700}
+.sb-section{font-size:10px;font-weight:700;color:var(--ink-3);letter-spacing:.1em;
+            text-transform:uppercase;padding:18px 12px 7px}
+
+/* brand picker on the join form */
+.brand-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;
+            border:1.5px solid var(--line-2);border-radius:999px;cursor:pointer;
+            font-size:12.5px;font-weight:600;color:var(--ink-2);
+            background:var(--surface);transition:.15s;user-select:none}
+.brand-chip:hover{border-color:var(--brand);color:var(--brand-text)}
+.brand-chip input{width:15px;height:15px;accent-color:var(--brand);cursor:pointer;margin:0}
+.brand-chip.on{background:var(--brand-light);border-color:var(--brand);color:var(--brand-text)}
 </style>
 </head>
 <body>
@@ -415,6 +488,47 @@ var T = {
     team:'Team',
     admin:'Admin Panel',
     resources:'Resources',
+    join_title:'Restaurant wants to join',
+    join_sub:'Fill this in once. The agreement goes out to the owner, and the tablet follows once it is signed.',
+    r_name:'Restaurant name',
+    o_name:'Owner name',
+    o_email:'Owner email',
+    o_phone:'Phone',
+    r_addr:'Address',
+    r_brands:'Brands they will run',
+    brands_hint:'Pick between 2 and 5.',
+    r_notes:'Notes',
+    notes_ph:'Anything useful for the team',
+    send_join:'Send the agreement',
+    my_joins:'My restaurants',
+    st_sent:'Agreement sent — waiting for signature',
+    st_signed:'Signed — tablet on the way',
+    st_shipped:'Tablet shipped',
+    st_live:'Live',
+    st_rejected:'Rejected',
+    tracking:'Tracking',
+    no_joins:'Nothing submitted yet',
+    fill_req:'Fill in the restaurant, owner and email',
+    pick_brands:'Pick at least 2 brands',
+    sent_ok:'Sent — the owner will receive the agreement',
+    res_title:'Resources',
+    res_sub:'Kitchen sheets and the links you send to restaurants.',
+    pay_form:'Payment details form',
+    pay_sub:'Send this to a restaurant once the tablet is with them, so they can fill in how they get paid.',
+    copy_link:'Copy link',
+    open_link:'Open',
+    add_link:'Add the link',
+    not_added:'Not added yet.',
+    fiches:'Fiches techniques',
+    fiches_sub:'One sheet per brand, English and French. Download and send to the restaurant.',
+    tk_title:'Tickets',
+    tk_sub_mine:'Problems you have raised.',
+    tk_sub_all:'Everything the team has raised.',
+    tk_new:'New ticket',
+    tk_none:'Nothing open right now',
+    tk_closed:'Closed',
+    tk_working:'Working on it',
+    tk_close:'Close',
     tickets:'Tickets',
     support:'Support',
     partners:'Partners',
@@ -463,6 +577,47 @@ var T = {
     team:'Équipe',
     admin:'Panneau admin',
     resources:'Ressources',
+    join_title:'Un restaurant veut nous rejoindre',
+    join_sub:'À remplir une seule fois. Le contrat part au propriétaire, et la tablette suit dès la signature.',
+    r_name:'Nom du restaurant',
+    o_name:'Nom du propriétaire',
+    o_email:'Courriel du propriétaire',
+    o_phone:'Téléphone',
+    r_addr:'Adresse',
+    r_brands:'Marques qu\'il va opérer',
+    brands_hint:'Choisissez entre 2 et 5.',
+    r_notes:'Notes',
+    notes_ph:'Tout ce qui est utile pour l\'équipe',
+    send_join:'Envoyer le contrat',
+    my_joins:'Mes restaurants',
+    st_sent:'Contrat envoyé — en attente de signature',
+    st_signed:'Signé — tablette en préparation',
+    st_shipped:'Tablette expédiée',
+    st_live:'En ligne',
+    st_rejected:'Refusé',
+    tracking:'Suivi',
+    no_joins:'Rien d\'envoyé pour l\'instant',
+    fill_req:'Remplissez le restaurant, le propriétaire et le courriel',
+    pick_brands:'Choisissez au moins 2 marques',
+    sent_ok:'Envoyé — le propriétaire va recevoir le contrat',
+    res_title:'Ressources',
+    res_sub:'Fiches techniques et liens à envoyer aux restaurants.',
+    pay_form:'Formulaire de coordonnées de paiement',
+    pay_sub:'À envoyer au restaurant une fois la tablette livrée, pour qu\'il indique comment être payé.',
+    copy_link:'Copier le lien',
+    open_link:'Ouvrir',
+    add_link:'Ajouter le lien',
+    not_added:'Pas encore ajouté.',
+    fiches:'Fiches techniques',
+    fiches_sub:'Une fiche par marque, en français et en anglais. Téléchargez et envoyez au restaurant.',
+    tk_title:'Tickets',
+    tk_sub_mine:'Les problèmes que vous avez signalés.',
+    tk_sub_all:'Tout ce que l\'équipe a signalé.',
+    tk_new:'Nouveau ticket',
+    tk_none:'Rien d\'ouvert pour le moment',
+    tk_closed:'Fermés',
+    tk_working:'En cours',
+    tk_close:'Fermer',
     tickets:'Tickets',
     support:'Support',
     partners:'Partenaires',
@@ -510,7 +665,7 @@ function setLang(l){
 }
 
 function getPageTitle(id){
-  var titles={reportcalc:'Report Calculator',reportsend:'Send Weekly Reports',resources:t('resources'),tickets:t('tickets'),dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
+  var titles={reportcalc:'Report Calculator',reportsend:'Send Weekly Reports',resources:t('resources'),tickets:t('tickets'),leads:t('join_title'),dashboard:t('dashboard'),add:t('add_resto'),pipeline:CU&&CU.role==='onboarding'?t('my_restos'):'Pipeline',tablet:t('tablet'),notifications:t('notifications'),clock:t('clock'),team:t('team'),admin:t('admin')};
   return titles[id]||id;
 }
 
@@ -581,7 +736,7 @@ var BRANDS = {
 
 var STEPS = [
   {id:0,who:"Nadir",title:"📦 Ship the tablet",
-   desc:"The agreement is signed. Send the tablet to the restaurant and note the tracking or courier here.",
+   desc:"The agreement is signed. Send the tablet to the restaurant and put the tracking number here — the sales team sees it on their side.",
    note:"Courier and tracking number",
    alert:"Saber: create the stores on Uber Eats and DoorDash"},
   {id:1,who:"Saber",title:"🏪 Create the stores",
@@ -708,9 +863,8 @@ function buildNav(){
     {id:'dashboard',ico:'grid',label:t('dashboard')},
     {id:'notifications',ico:'bell',label:t('notifications'),badge:true},
     {sec:'My Work'},
-    {id:'leads',ico:'tablet',label:'My Leads'},
+    {id:'leads',ico:'plus',label:t('join_title')},
     {id:'wallet',ico:'tablet',label:'My Wallet'},
-    {id:'tablet',ico:'tablet',label:t('tablet')},
     {sec:t('support')},
     {id:'resources',ico:'file',label:t('resources')},
     {id:'tickets',ico:'bell',label:t('tickets'),ticketBadge:true},
@@ -1223,6 +1377,13 @@ function openResto(id){
   openModal('modal-resto');
 }
 
+/* Step 1 is the shipment, so its note is the tracking number the sales team needs. */
+function pushTracking(rest, text){
+  if(!text) return;
+  var name=(rest.name||'').toLowerCase().trim();
+  var hit=leads.filter(function(l){ return (l.restaurantName||'').toLowerCase().trim()===name; })[0];
+  if(hit) db.collection('leads').doc(hit.id).update({tracking:text, status:'shipped'});
+}
 function completeStep(id,stepIndex){
   var r=restaurants.find(function(x){return x.id===id;});
   if(!r)return;
@@ -1232,20 +1393,22 @@ function completeStep(id,stepIndex){
   var newStep=stepIndex+1;
   var notes=r.stepNotes||{};
   notes[stepIndex]=noteText;
-  var isLive=newStep>=9;
+  var isLive=newStep>=STEPS.length;
   var updateData={stepIndex:newStep,stepNotes:notes};
   if(isLive)updateData.status='live';
+  if(stepIndex===0) pushTracking(r,noteText);   /* the shipment note is the tracking number */
   db.collection('restaurants').doc(id).update(updateData).then(function(){
     var doneTitle=STEPS[stepIndex]?STEPS[stepIndex].title:'step';
     var nextDef=STEPS[newStep];
     var msg='✅ '+CU.name+' completed "'+doneTitle+'" for '+r.name;
     if(nextDef)msg+=' → Next: '+nextDef.title+' ('+nextDef.who+')';
     addNotif('step',msg);
-    if(stepIndex===6){
-      sendEmail('Ready for Review: '+r.name,CU.name,'🔔 '+r.name+' ready for review. Completed by: '+CU.name+'. Note: '+noteText);
-    }
+
     if(isLive){
       addNotif('live','🚀 '+r.name+' is now LIVE! 🎉');
+      var ln=(r.name||'').toLowerCase().trim();
+      var lead=leads.filter(function(l){return (l.restaurantName||'').toLowerCase().trim()===ln;})[0];
+      if(lead) db.collection('leads').doc(lead.id).update({status:'live'});
       sendEmail('LIVE: '+r.name,CU.name,'🚀 '+r.name+' is now LIVE! Marketing starts now.');
     }
     showToast(isLive?'🚀 LIVE!':'✅ Done! Next: '+(nextDef?nextDef.title:'Complete'));
@@ -1557,104 +1720,93 @@ function renderLeadsOwner(){
 }
 
 function renderLeadsSales(){
-  var myLeads = leads.filter(function(l){ return l.submittedBy===CU.name; });
-  var tabletedNames = new Set(tablets.filter(function(tb){ return tb.submittedBy===CU.name; })
-    .map(function(tb){ return (tb.restaurantName||'').toLowerCase().trim(); }));
-  var approved = myLeads.filter(function(l){ return l.status==='approved' && !tabletedNames.has((l.restaurantName||'').toLowerCase().trim()); });
+  var mine = leads.filter(function(l){ return l.submittedBy===CU.name; });
 
-  var sc = {pending:'⏳ Contract sent — waiting for signature',pending_approval:'📋 Signed — awaiting Nadir',signed:'✍️ Signed',approved:'✅ Approved — can request tablet',rejected:'❌ Rejected'};
-  var cc = {pending:'#b45309',pending_approval:'#1d4ed8',signed:'#065f46',approved:'#15803d',rejected:'#dc2626'};
+  var sc={ pending:t('st_sent'), pending_approval:t('st_sent'), signed:t('st_signed'),
+           approved:t('st_signed'), shipped:t('st_shipped'), live:t('st_live'), rejected:t('st_rejected') };
+  var cc={ pending:'#B45309', pending_approval:'#B45309', signed:'#1D4ED8',
+           approved:'#1D4ED8', shipped:'#7C3AED', live:'#15803D', rejected:'#DC2626' };
 
-  var leadsHTML = myLeads.length ? myLeads.map(function(l){
-    return '<div style="border:1px solid var(--gray-100);border-radius:12px;padding:14px 16px;margin-bottom:8px;background:#fff;">'
-      +'<div style="font-size:14px;font-weight:700;">'+esc(l.restaurantName)+'</div>'
-      +'<div style="font-size:12px;color:#666;margin-top:2px;">👤 '+esc(l.ownerName)+' · 📧 '+esc(l.ownerEmail)+'</div>'
-      +(l.address ? '<div style="font-size:12px;color:#666;">📍 '+esc(l.address)+'</div>' : '')
-      +'<div style="font-size:12px;font-weight:700;color:'+(cc[l.status]||'#666')+';margin-top:6px;">'+(sc[l.status]||l.status)+'</div>'
-      +(l.status==='rejected'&&l.rejectReason ? '<div style="font-size:11px;color:#dc2626;">'+esc(l.rejectReason)+'</div>' : '')
+  var listHTML = mine.length ? mine.map(function(l){
+    var track = l.tracking
+      ? '<div style="font-size:12px;color:#6B21A8;margin-top:4px">📦 '+t('tracking')+': <strong>'+esc(l.tracking)+'</strong></div>'
+      : '';
+    return '<div style="border:1px solid var(--gray-100);border-radius:12px;padding:14px 16px;margin-bottom:8px;background:#fff">'
+      +'<div style="font-size:14px;font-weight:700">'+esc(l.restaurantName)+'</div>'
+      +'<div style="font-size:12px;color:#666;margin-top:2px">'+esc(l.ownerName)+' · '+esc(l.ownerEmail)+'</div>'
+      +(l.address?'<div style="font-size:12px;color:#666">'+esc(l.address)+'</div>':'')
+      +((l.brands&&l.brands.length)?'<div style="font-size:12px;color:#4C1D95;margin-top:5px">'+l.brands.map(esc).join(' · ')+'</div>':'')
+      +'<div style="font-size:12px;font-weight:700;color:'+(cc[l.status]||'#666')+';margin-top:6px">'+(sc[l.status]||l.status)+'</div>'
+      +track
+      +(l.status==='rejected'&&l.rejectReason?'<div style="font-size:11px;color:#DC2626">'+esc(l.rejectReason)+'</div>':'')
       +'</div>';
-  }).join('') : '<div class="empty" style="padding:1.5rem;"><p>No leads yet</p></div>';
+  }).join('') : '<div class="empty" style="padding:1.5rem"><p>'+t('no_joins')+'</p></div>';
 
-  // Tablet request section — only if approved leads exist
-  var tabletSection = '';
-  if(approved.length){
-    var opts = approved.map(function(l){
-      return '<option value="'+l.id+'" data-name="'+esc(l.restaurantName)+'" data-owner="'+esc(l.ownerName)+'" data-phone="'+esc(l.phone||'')+'" data-addr="'+esc(l.address||'')+'">'+esc(l.restaurantName)+'</option>';
-    }).join('');
-    tabletSection = '<div class="sec-lbl" style="margin-top:16px;">📦 Ready to request tablet</div>'
-      +'<div class="card"><div class="card-body">'
-      +'<p style="font-size:13px;color:#555;margin-bottom:12px;">These restaurants are approved. Go to Tablet Requests to submit.</p>'
-      +'<button onclick="showPage(\'tablet\',document.getElementById(\'nav-tablet\'))" class="btn btn-primary">📦 Go to Tablet Requests</button>'
+  var brandsHTML = BRANDS_FICHE.map(function(g){
+    return '<div style="margin-bottom:10px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">'+esc(g.cat)+'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +g.items.map(function(b){
+        return '<label class="brand-chip"><input type="checkbox" class="ld-brand" value="'+esc(b)+'" onchange="brandChipSync(this)">'
+          +'<span>'+esc(b)+'</span></label>';
+      }).join('')
       +'</div></div>';
-  }
+  }).join('');
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>My Leads</h2><p>Submit a restaurant — a contract is sent to the owner automatically.</p></div>'
+    '<div class="page-hdr"><h2>'+t('join_title')+'</h2><p>'+t('join_sub')+'</p></div>'
     +'<div class="g2">'
-    +'<div class="card"><div class="card-hdr"><div class="card-title">📋 New Lead</div></div><div class="card-body">'
-    +'<div class="field"><label>Restaurant name *</label><input id="ld-rname" type="text" placeholder="Restaurant name"></div>'
-    +'<div class="field-row">'
-    +'<div class="field"><label>Owner name *</label><input id="ld-owner" type="text" placeholder="Full name"></div>'
-    +'<div class="field"><label>Phone</label><input id="ld-phone" type="tel" placeholder="+1 514 000 0000"></div>'
-    +'</div>'
-    +'<div class="field"><label>Owner email *</label><input id="ld-email" type="email" placeholder="owner@restaurant.com"></div>'
-    +'<div class="field"><label>Address</label><input id="ld-addr" type="text" placeholder="Full address"></div>'
-    +'<div class="field"><label>Notes</label><textarea id="ld-notes" placeholder="Useful info..."></textarea></div>'
-    +'<button class="btn btn-primary btn-full" id="btn-lead" onclick="submitLead()" style="margin-top:8px;">📋 Submit lead</button>'
+    +'<div class="card"><div class="card-body">'
+      +'<div class="field"><label>'+t('r_name')+' *</label><input id="ld-rname" type="text"></div>'
+      +'<div class="field-row">'
+        +'<div class="field"><label>'+t('o_name')+' *</label><input id="ld-owner" type="text"></div>'
+        +'<div class="field"><label>'+t('o_phone')+'</label><input id="ld-phone" type="tel" placeholder="+1 514 000 0000"></div>'
+      +'</div>'
+      +'<div class="field"><label>'+t('o_email')+' *</label><input id="ld-email" type="email" placeholder="owner@restaurant.com"></div>'
+      +'<div class="field"><label>'+t('r_addr')+'</label><input id="ld-addr" type="text"></div>'
+      +'<div class="field"><label>'+t('r_brands')+' * <span style="font-weight:400;color:var(--gray-500)">— '+t('brands_hint')+'</span></label>'
+        +'<div id="ld-brands">'+brandsHTML+'</div>'
+        +'<div id="ld-brand-count" style="font-size:12px;color:var(--gray-500);margin-top:4px">0 selected</div></div>'
+      +'<div class="field"><label>'+t('r_notes')+'</label><textarea id="ld-notes" placeholder="'+t('notes_ph')+'"></textarea></div>'
+      +'<button id="btn-lead" class="btn btn-primary btn-full" onclick="submitLead()">'+t('send_join')+'</button>'
     +'</div></div>'
-    +'<div>'
-    +'<div class="sec-lbl">My leads ('+myLeads.length+')</div>'
-    +'<div class="card">'+leadsHTML+'</div>'
-    +tabletSection
-    +'</div>'
+    +'<div><div class="sec-lbl">'+t('my_joins')+' ('+mine.length+')</div>'
+      +'<div style="max-height:70vh;overflow:auto">'+listHTML+'</div></div>'
     +'</div>';
 }
-
+function brandChipSync(cb){
+  cb.parentNode.classList.toggle('on', cb.checked);
+  var n=document.querySelectorAll('.ld-brand:checked').length;
+  var el=document.getElementById('ld-brand-count');
+  if(el){ el.textContent=n+' selected'; el.style.color = (n>=2&&n<=5)?'#15803D':'var(--gray-500)'; }
+}
 function submitLead(){
-  var rname = document.getElementById('ld-rname').value.trim();
-  var owner = document.getElementById('ld-owner').value.trim();
-  var email = document.getElementById('ld-email').value.trim();
-  if(!rname||!owner||!email){ showToast('Fill required fields'); return; }
-  var btn = document.getElementById('btn-lead');
-  btn.disabled=true; btn.textContent='Sending...';
-  var phone = document.getElementById('ld-phone').value.trim();
-  var addr  = document.getElementById('ld-addr').value.trim();
-  var notes = document.getElementById('ld-notes').value.trim();
-
+  var rname=document.getElementById('ld-rname').value.trim();
+  var owner=document.getElementById('ld-owner').value.trim();
+  var email=document.getElementById('ld-email').value.trim();
+  if(!rname||!owner||!email){ showToast(t('fill_req')); return; }
+  var brands=[].slice.call(document.querySelectorAll('.ld-brand:checked')).map(function(c){return c.value;});
+  if(brands.length<2){ showToast(t('pick_brands')); return; }
+  var btn=document.getElementById('btn-lead');
+  btn.disabled=true; btn.textContent='…';
   db.collection('leads').add({
     restaurantName:rname, ownerName:owner, ownerEmail:email,
-    phone:phone, address:addr, notes:notes,
-    submittedBy:CU.name, status:'pending',
+    phone:document.getElementById('ld-phone').value.trim(),
+    address:document.getElementById('ld-addr').value.trim(),
+    brands:brands,
+    notes:document.getElementById('ld-notes').value.trim(),
+    status:'pending', submittedBy:CU.name, submittedByEmail:CU.email,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    // Notify Nadir by email to send DocuSign contract
-    emailjs.init(EMAILJS_KEY);
-    emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
-      title:'[BranChef] Nouveau lead — Envoyer contrat DocuSign',
-      name: 'Nadir',
-      message: 'Bonjour Nadir,'
-        +'\n\n'+CU.name+' vient d\'ajouter un nouveau lead :'
-        +'\n\n— Restaurant : '+rname
-        +'\n— Proprietaire : '+owner
-        +'\n— Email : '+email
-        +'\n— Telephone : '+(phone||'—')
-        +'\n— Adresse : '+(addr||'—')
-        +(notes?'\n— Notes : '+notes:'')
-        +'\n\nVeuillez envoyer le contrat BranChef via DocuSign a : '+email
-        +'\n\n— BranChef App',
-      email: 'branchemr@gmail.com',
-      time: new Date().toLocaleTimeString('fr-CA',{hour12:false})
-    }).catch(function(e){console.log('email err',e);});
-    addNotif('new','📋 '+CU.name+' added lead: '+rname+' ('+owner+') — Nadir notified to send DocuSign to '+email);
-    showToast('✅ Lead saved! Nadir will be notified to send DocuSign contract.');
-    btn.disabled=false; btn.textContent='📋 Submit lead';
-    ['ld-rname','ld-owner','ld-phone','ld-email','ld-addr','ld-notes'].forEach(function(id){
-      var el=document.getElementById(id); if(el)el.value='';
+    addNotif('lead', CU.name+' brought '+rname+' ('+owner+') — '+brands.length+' brands · agreement to '+email);
+    showToast(t('sent_ok'));
+    ['ld-rname','ld-owner','ld-email','ld-phone','ld-addr','ld-notes'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.value='';
     });
-    renderLeads();
+    document.querySelectorAll('.ld-brand').forEach(function(c){ c.checked=false; brandChipSync(c); });
+    btn.disabled=false; btn.textContent=t('send_join');
   }).catch(function(e){
-    showToast('Error: '+e.message);
-    btn.disabled=false; btn.textContent='📋 Submit lead';
+    showToast('Error: '+(e.message||e)); btn.disabled=false; btn.textContent=t('send_join');
   });
 }
 
