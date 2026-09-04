@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090301">
+<meta name="bc-version" content="2026090302">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1722,9 +1722,12 @@ function renderLeadsOwner(){
 function renderLeadsSales(){
   var mine = leads.filter(function(l){ return l.submittedBy===CU.name; });
 
-  var sc={ pending:t('st_sent'), pending_approval:t('st_sent'), signed:t('st_signed'),
+  var sc={ sending:'…', send_failed:'⚠️ Agreement did not send — tell Nadir',
+           viewed:'👀 Opened the agreement',
+           pending:t('st_sent'), pending_approval:t('st_sent'), signed:t('st_signed'),
            approved:t('st_signed'), shipped:t('st_shipped'), live:t('st_live'), rejected:t('st_rejected') };
-  var cc={ pending:'#B45309', pending_approval:'#B45309', signed:'#1D4ED8',
+  var cc={ sending:'#807E8C', send_failed:'#DC2626', viewed:'#2563EB',
+           pending:'#B45309', pending_approval:'#B45309', signed:'#1D4ED8',
            approved:'#1D4ED8', shipped:'#7C3AED', live:'#15803D', rejected:'#DC2626' };
 
   var listHTML = mine.length ? mine.map(function(l){
@@ -1787,29 +1790,54 @@ function submitLead(){
   if(!rname||!owner||!email){ showToast(t('fill_req')); return; }
   var brands=[].slice.call(document.querySelectorAll('.ld-brand:checked')).map(function(c){return c.value;});
   if(brands.length<2){ showToast(t('pick_brands')); return; }
+
   var btn=document.getElementById('btn-lead');
   btn.disabled=true; btn.textContent='…';
+
+  var leadRef=null;
   db.collection('leads').add({
     restaurantName:rname, ownerName:owner, ownerEmail:email,
     phone:document.getElementById('ld-phone').value.trim(),
     address:document.getElementById('ld-addr').value.trim(),
     brands:brands,
     notes:document.getElementById('ld-notes').value.trim(),
-    status:'pending', submittedBy:CU.name, submittedByEmail:CU.email,
+    status:'sending', submittedBy:CU.name, submittedByEmail:CU.email,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){
-    addNotif('lead', CU.name+' brought '+rname+' ('+owner+') — '+brands.length+' brands · agreement to '+email);
-    showToast(t('sent_ok'));
+  })
+  .then(function(ref){
+    leadRef=ref;
+    /* the agreement is sent server-side — the DocuSign key never touches the browser */
+    return currentUser.getIdToken().then(function(idToken){
+      return fetch('/api/send-contract',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ idToken:idToken, leadId:ref.id,
+          restaurantName:rname, ownerName:owner, ownerEmail:email, brands:brands })
+      });
+    });
+  })
+  .then(function(res){ return res.json().then(function(b){ return {ok:res.ok, body:b}; }); })
+  .then(function(r){
+    if(!r.ok) throw new Error(r.body.error||'could not send the agreement');
+    return leadRef.update({ status:'pending', envelopeId:r.body.envelopeId||'' })
+      .then(function(){
+        addNotif('lead', CU.name+' brought '+rname+' — agreement sent to '+email+' ('+brands.length+' brands)');
+        showToast(t('sent_ok'));
+      });
+  })
+  .catch(function(e){
+    /* the lead is saved either way, so nothing is lost if DocuSign refuses */
+    if(leadRef) leadRef.update({ status:'send_failed', sendError:String(e.message||e) });
+    alert('The restaurant is saved, but the agreement did not go out:\n\n'
+      +(e.message||e)+'\n\nNadir can send it by hand from DocuSign.');
+  })
+  .then(function(){
     ['ld-rname','ld-owner','ld-email','ld-phone','ld-addr','ld-notes'].forEach(function(id){
       var el=document.getElementById(id); if(el) el.value='';
     });
     document.querySelectorAll('.ld-brand').forEach(function(c){ c.checked=false; brandChipSync(c); });
     btn.disabled=false; btn.textContent=t('send_join');
-  }).catch(function(e){
-    showToast('Error: '+(e.message||e)); btn.disabled=false; btn.textContent=t('send_join');
   });
 }
-
 function doApproveLead(btn){
   var id   = btn.getAttribute('data-lid');
   var name = btn.getAttribute('data-lname');
@@ -3123,7 +3151,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090301';
+  var CURRENT = '2026090302';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
