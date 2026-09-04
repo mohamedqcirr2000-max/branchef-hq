@@ -14,17 +14,32 @@ module.exports = async (req, res) => {
     const list = await ds('/templates?count=50');
     const templates = [];
     for (const tpl of (list.envelopeTemplates || [])) {
-      let roles = [], tabs = 0;
+      let roles = [], tabs = 0, tabDetail = {}, docs = [], note = '';
       try {
         const full = await ds('/templates/' + tpl.templateId);
         const signers = (full.recipients && full.recipients.signers) || [];
         roles = signers.map(s => s.roleName || '(no role name)');
+        docs  = (full.documents || []).map(d => d.name);
         signers.forEach(s => {
           const t = s.tabs || {};
-          Object.keys(t).forEach(k => { if (Array.isArray(t[k])) tabs += t[k].length; });
+          Object.keys(t).forEach(k => {
+            if (Array.isArray(t[k]) && t[k].length) { tabs += t[k].length; tabDetail[k] = t[k].length; }
+          });
         });
+        /* the recipient object does not always carry tabs — ask for them directly */
+        if (!tabs && signers.length) {
+          for (const s of signers) {
+            try {
+              const rt = await ds('/templates/' + tpl.templateId + '/recipients/' + s.recipientId + '/tabs');
+              Object.keys(rt).forEach(k => {
+                if (Array.isArray(rt[k]) && rt[k].length) { tabs += rt[k].length; tabDetail[k] = rt[k].length; }
+              });
+            } catch (e2) { note = 'tab read: ' + e2.message; }
+          }
+        }
       } catch (err) { roles = ['(could not read: ' + err.message + ')']; }
-      templates.push({ name: tpl.name, templateId: tpl.templateId, roles, signingFields: tabs });
+      templates.push({ name: tpl.name, templateId: tpl.templateId, roles,
+                       signingFields: tabs, fieldTypes: tabDetail, documents: docs, note });
     }
 
     return res.status(200).json({
