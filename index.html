@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090405">
+<meta name="bc-version" content="2026090406">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -520,6 +520,15 @@ var lang = localStorage.getItem('bc_lang') || 'en';
 var T = {
   en: {
     cancel:'Cancel', save:'Save', saved:'Saved', password:'Password',
+    edit:'Edit', loading:'Loading…', sheet_help_t:'Adding or replacing a sheet',
+    tab_title:'Tablet requests', tab_sub:'Where each tablet is on its way to the restaurant.',
+    tab_new:'New tablet request', tab_pending:'Pending requests', tab_mine:'My pending requests',
+    tab_none:'No pending requests', mark_ship:'Mark shipped',
+    clock_title:'Clock In / Out', clock_sub:'Track your working hours.',
+    my_sessions:'My sessions today', team_hours:'Team hours today',
+    team_title:'Team', team_sub:'Everyone on BranChef and what they do.',
+    admin_title:'Admin Panel', admin_sub:'Control everything from here - owners only.',
+    name_c:'Name', email_c:'Email', role_c:'Role', submitted_by:'Submitted by',
     owners_only:'Owners only', gone:'Deleted',
     del_title:'Delete', del_body:'It moves to Trash. Any owner can restore it from the Admin Panel for 30 days.', del_ok:'Move to Trash',
     purge_title:'Delete forever?', purge_body:'this one really cannot be undone.', purge_ok:'Delete forever',
@@ -630,6 +639,15 @@ var T = {
   },
   fr: {
     cancel:'Annuler', save:'Enregistrer', saved:'Enregistré', password:'Mot de passe',
+    edit:'Modifier', loading:'Chargement…', sheet_help_t:'Ajouter ou remplacer une fiche',
+    tab_title:'Demandes de tablette', tab_sub:'Où en est chaque tablette sur la route du restaurant.',
+    tab_new:'Nouvelle demande', tab_pending:'Demandes en attente', tab_mine:'Mes demandes en attente',
+    tab_none:'Aucune demande en attente', mark_ship:'Marquer expédiée',
+    clock_title:'Pointage', clock_sub:'Suivez vos heures de travail.',
+    my_sessions:'Mes sessions aujourd\'hui', team_hours:'Heures de l\'équipe aujourd\'hui',
+    team_title:'Équipe', team_sub:'Toute l\'équipe BranChef et son rôle.',
+    admin_title:'Panneau admin', admin_sub:'Tout se pilote d\'ici - propriétaires seulement.',
+    name_c:'Nom', email_c:'Courriel', role_c:'Rôle', submitted_by:'Soumis par',
     owners_only:'Propriétaires seulement', gone:'Supprimé',
     del_title:'Supprimer', del_body:'L\'élément va dans la Corbeille. Un propriétaire peut le restaurer pendant 30 jours depuis le Panneau admin.', del_ok:'Mettre à la Corbeille',
     purge_title:'Supprimer définitivement ?', purge_body:'celui-ci ne pourra vraiment pas être récupéré.', purge_ok:'Supprimer définitivement',
@@ -1185,7 +1203,7 @@ function renderDashboard(){
     +'<div class="sec-lbl">'+t('team_online')+'</div>'
     +'<div class="card"><div class="card-body"><div id="online-grid" class="online-wrap"><div class="spin" style="width:20px;height:20px;border-width:2px;"></div></div></div></div>'
     +(CU.role==='owner'?'<div class="sec-lbl">'+t('clock_log')+'</div><div class="card" id="clock-log-dash"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>':'')
-    +(CU.role==='sales'?'<div class="sec-lbl" style="margin-top:16px;">My Restaurants</div><div class="card" id="my-restos-dash"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>':'')
+    +(CU.role==='sales'?'<div class="sec-lbl" style="margin-top:16px;">'+t('my_restos')+'</div><div class="card" id="my-restos-dash"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>':'')
     +'</div>'
     +'</div>';
 
@@ -1550,20 +1568,20 @@ function completeStep(id,stepIndex){
 // ==========================================
 function renderTablet(){
   var isOwner=(CU.role==='owner');
-  var visible=tablets.filter(function(t){
-    if(t.status!=='pending')return false;
-    return isOwner || t.submittedBy===CU.name;
+  var visible=tablets.filter(function(tb){
+    if(tb.status!=='pending')return false;
+    return isOwner || tb.submittedBy===CU.name;
   });
-  var pendingRows=visible.map(function(t){
+  var pendingRows=visible.map(function(tb){
     return '<tr>'
-      +'<td><strong>'+esc(t.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(t.address)+'</div></td>'
-      +(isOwner?'<td>'+esc(t.submittedBy)+'</td>':'')
-      +'<td><span class="pill pill-pending">Pending</span></td>'
-      +(isOwner?'<td><button class="btn btn-success" onclick="markShipped(\''+t.id+'\',\''+esc(t.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">Mark shipped</button></td>':'')
+      +'<td><strong>'+esc(tb.restaurantName)+'</strong><div style="font-size:12px;color:var(--gray-400);">'+esc(tb.address)+'</div></td>'
+      +(isOwner?'<td>'+esc(tb.submittedBy)+'</td>':'')
+      +'<td><span class="pill pill-pending">'+t('pending')+'</span></td>'
+      +(isOwner?'<td><button class="btn btn-success" onclick="markShipped(\''+tb.id+'\',\''+esc(tb.restaurantName)+'\')" style="font-size:11px;padding:5px 10px;">'+t('mark_ship')+'</button></td>':'')
       +'</tr>';
   }).join('');
-  var headCols='<th>Restaurant</th>'+(isOwner?'<th>Submitted by</th>':'')
-    +'<th>Status</th>'+(isOwner?'<th></th>':'');
+  var headCols='<th>'+t('restaurant')+'</th>'+(isOwner?'<th>'+t('submitted_by')+'</th>':'')
+    +'<th>'+t('status_c')+'</th>'+(isOwner?'<th></th>':'');
 
   var salesNotice='';
   if(CU.role==='sales'){
@@ -1585,10 +1603,10 @@ function renderTablet(){
     }
   }
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Tablet Request</h2><p>Submit when a restaurant confirms they want a tablet.</p></div>'
+    '<div class="page-hdr"><h2>'+t('tab_title')+'</h2><p>'+t('tab_sub')+'</p></div>'
     +salesNotice
     +'<div class="g2">'
-    +'<div class="card"><div class="card-hdr"><div class="card-title">📦 New tablet request</div></div><div class="card-body">'
+    +'<div class="card"><div class="card-hdr"><div class="card-title">📦 '+t('tab_new')+'</div></div><div class="card-body">'
     +'<div class="field"><label>Restaurant name *</label><input id="t-name" type="text" placeholder="Restaurant name"></div>'
     +'<div class="field-row">'
     +'<div class="field"><label>Owner name *</label><input id="t-owner" type="text" placeholder="Owner full name"></div>'
@@ -1599,10 +1617,10 @@ function renderTablet(){
     +'<button class="btn btn-primary btn-full" onclick="submitTablet()" id="btn-tablet" style="margin-top:8px;">📦 Send tablet request</button>'
     +'</div></div>'
     +'<div>'
-    +'<div class="sec-lbl">'+(isOwner?'Pending requests':'My pending requests')+' ('+visible.length+')</div>'
+    +'<div class="sec-lbl">'+(isOwner?t('tab_pending'):t('tab_mine'))+' ('+visible.length+')</div>'
     +'<div class="card">'
     +(pendingRows?'<div class="tbl-wrap"><table><thead><tr>'+headCols+'</tr></thead><tbody>'+pendingRows+'</tbody></table></div>'
-      :'<div class="empty" style="padding:1.5rem;"><p>No pending requests 🎉</p></div>')
+      :'<div class="empty" style="padding:1.5rem;"><p>'+t('tab_none')+' 🎉</p></div>')
     +'</div>'
     +'</div>'
     +'</div>';
@@ -1993,6 +2011,42 @@ var LEAD_STAGES=[
   {v:'send_failed',      t:'Agreement failed to send'}
 ];
 
+// Who actually needs to hear about a stage. Saber only appears once the
+// restaurant is his to work on - he was getting every "agreement sent" before.
+function audienceFor(stage, salesPerson){
+  var A={
+    pending:          [salesPerson],
+    viewed:           [salesPerson],
+    send_failed:      [salesPerson,'Nadir'],
+    pending_approval: [salesPerson,'Nadir','Simo'],
+    approved:         [salesPerson,'Nadir','Saber'],
+    shipped:          [salesPerson,'Saber'],
+    live:             [salesPerson,'Nadir','Simo','Saber'],
+    rejected:         [salesPerson,'Nadir']
+  };
+  return (A[stage]||[salesPerson]).filter(Boolean);
+}
+
+function notifyStage(lead, stage, name){
+  var labels={
+    pending:'agreement sent, waiting for signature',
+    viewed:'opened the agreement',
+    send_failed:'agreement failed to send',
+    pending_approval:'signed - waiting for approval',
+    approved:'approved - ready for the tablet and store setup',
+    shipped:'tablet shipped',
+    live:'is now LIVE',
+    rejected:'was rejected'
+  };
+  db.collection('notifications').add({
+    type: stage==='live'?'live':(stage==='rejected'?'system':'new'),
+    message: name+' - '+(labels[stage]||stage),
+    to: audienceFor(stage, lead.submittedBy),
+    read:false, createdBy:CU.name,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(){});
+}
+
 function editLeadStatus(id,name){
   if(CU.role!=='owner'){ showToast(t('owners_only')); return; }
   var l=leads.filter(function(x){return x.id===id;})[0]||{};
@@ -2004,14 +2058,7 @@ function editLeadStatus(id,name){
     var upd={status:v.st, statusSetBy:CU.name, statusSetAt:firebase.firestore.FieldValue.serverTimestamp()};
     if(v.st!=='rejected') upd.rejectReason=firebase.firestore.FieldValue.delete();
     db.collection('leads').doc(id).update(upd).then(function(){
-      var label=(LEAD_STAGES.filter(function(x){return x.v===v.st;})[0]||{}).t||v.st;
-      var ref=db.collection('notifications').doc();
-      ref.set({
-        type:'new', message:CU.name+' set '+name+' to: '+label,
-        to:[l.submittedBy,'Nadir','Saber','Simo'].filter(Boolean),
-        read:false, createdBy:CU.name,
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(function(){});
+      notifyStage(l, v.st, name);
       showToast('Stage updated');
       renderLeads();
     }).catch(function(e){ showToast('Could not update: '+(e.message||e)); });
@@ -2030,8 +2077,9 @@ function doApproveLead(btn){
     // Nadir approving IS the go-ahead to ship, so raise the tablet request here
     // instead of making the sales person fill the same form again.
     var lead=leads.filter(function(x){return x.id===id;})[0]||{};
+    var key=(name||'').toLowerCase().trim();
     var already=tablets.some(function(tb){
-      return (tb.restaurantName||'').toLowerCase().trim()===(name||'').toLowerCase().trim();
+      return (tb.restaurantName||'').toLowerCase().trim()===key;
     });
     if(!already){
       db.collection('tablets').add({
@@ -2041,7 +2089,27 @@ function doApproveLead(btn){
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       }).catch(function(){});
     }
-    addNotif('tablet','Approved: '+name+' - tablet request created, ready to ship');
+
+    // This is the step that was missing: put the restaurant into the onboarding
+    // pipeline and hand it to Saber. Without this the signed lead never showed
+    // up in his Pipeline at all.
+    var inPipe=restaurants.some(function(r){
+      return (r.name||'').toLowerCase().trim()===key;
+    });
+    if(!inPipe){
+      db.collection('restaurants').add({
+        name:name, address:lead.address||'', ownerName:lead.ownerName||'',
+        phone:lead.phone||'', email:lead.ownerEmail||'',
+        brands:lead.brands||[], platforms:['Uber Eats'],
+        agent:'Saber', notes:lead.notes||'',
+        status:'new', stepIndex:0,
+        submittedBy:lead.submittedBy||CU.name,
+        fromLead:id,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(){});
+    }
+
+    notifyStage(lead,'approved',name);
     if(typeof sendEmail==='function')
       sendEmail('SHIP TABLET: '+name, CU.name,
         name+' is approved. Owner: '+(lead.ownerName||'')+' | '+(lead.phone||'')
@@ -2165,33 +2233,33 @@ async function scanFiches(){
 
 function renderResources(){
   var manage=canManage();
-  var html='<div class="page-hdr"><h2>Resources</h2><p>Kitchen sheets and the links you send to restaurants.</p></div>';
+  var html='<div class="page-hdr"><h2>'+t('res_title')+'</h2><p>'+t('res_sub')+'</p></div>';
 
   // ---- links the sales team sends out ----
   var payLink=links.payment||'';
   html+='<div class="card" style="margin-bottom:1.25rem"><div style="padding:1.25rem">'
-    +'<h3 style="margin:0 0 .35rem;font-size:1rem">Payment details form</h3>'
-    +'<p style="margin:0 0 .9rem;color:var(--gray-600);font-size:.85rem">Send this to a restaurant once the tablet is with them, so they can fill in how they get paid.</p>';
+    +'<h3 style="margin:0 0 .35rem;font-size:1rem">'+t('pay_form')+'</h3>'
+    +'<p style="margin:0 0 .9rem;color:var(--gray-600);font-size:.85rem">'+t('pay_sub')+'</p>';
   if(payLink){
     html+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">'
       +'<input id="pay-link" readonly value="'+esc(payLink)+'" style="flex:1;min-width:240px;padding:.6rem .75rem;border:1.5px solid var(--gray-200);border-radius:8px;font-size:.85rem;background:var(--gray-50)">'
-      +'<button class="btn" onclick="copyLink()">Copy link</button>'
-      +'<a class="btn btn-ghost" href="'+esc(payLink)+'" target="_blank" rel="noopener">Open</a>'
-      +(manage?'<button class="btn btn-ghost" onclick="editPayLink()">Edit</button>':'')
+      +'<button class="btn" onclick="copyLink()">'+t('copy_link')+'</button>'
+      +'<a class="btn btn-ghost" href="'+esc(payLink)+'" target="_blank" rel="noopener">'+t('open_link')+'</a>'
+      +(manage?'<button class="btn btn-ghost" onclick="editPayLink()">'+t('edit')+'</button>':'')
       +'</div>';
   } else {
     html+= manage
-      ? '<button class="btn" onclick="editPayLink()">Add the link</button>'
-      : '<p style="color:var(--gray-500);font-size:.85rem;margin:0">Not added yet.</p>';
+      ? '<button class="btn" onclick="editPayLink()">'+t('add_link')+'</button>'
+      : '<p style="color:var(--gray-500);font-size:.85rem;margin:0">'+t('not_added')+'</p>';
   }
   html+='</div></div>';
 
   // ---- fiches techniques ----
-  html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1.1rem">Fiches techniques</h2>'
-    +'<p>One sheet per brand, English and French. Download and send to the restaurant.</p></div>';
+  html+='<div class="page-hdr" style="margin-top:1.5rem"><h2 style="font-size:1.1rem">'+t('fiches')+'</h2>'
+    +'<p>'+t('fiches_sub')+'</p></div>';
 
   if(!fichesReady){
-    html+='<div class="card"><div style="padding:2rem;text-align:center;color:var(--gray-500)">Loading…</div></div>';
+    html+='<div class="card"><div style="padding:2rem;text-align:center;color:var(--gray-500)">'+t('loading')+'</div></div>';
   } else {
     BRANDS_FICHE.forEach(function(g){
       html+='<div class="card" style="margin-bottom:1rem"><div style="padding:1rem 1.25rem;border-bottom:1px solid var(--gray-100)">'
@@ -2208,7 +2276,7 @@ function renderResources(){
     });
     if(manage){
       html+='<div class="card" style="background:var(--gray-50)"><div style="padding:1.25rem">'
-        +'<strong style="font-size:.9rem">Adding or replacing a sheet</strong>'
+        +'<strong style="font-size:.9rem">'+t('sheet_help_t')+'</strong>'
         +'<div style="color:var(--gray-600);font-size:.83rem;margin-top:.5rem;line-height:1.75">'
         +'Upload the PDF into the <code>fiches</code> folder of the branchef-hq repo, named '
         +'<code>brand-en.pdf</code> or <code>brand-fr.pdf</code> — for example <code>smash-meat-en.pdf</code>.<br>'
@@ -2449,7 +2517,7 @@ function toastMsg(t){
 // ==========================================
 function renderClock(){
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Clock In / Out</h2><p>Track your working hours.</p></div>'
+    '<div class="page-hdr"><h2>'+t('clock_title')+'</h2><p>'+t('clock_sub')+'</p></div>'
     +'<div class="g2">'
     +'<div>'
     +'<div class="clock-hero">'
@@ -2458,11 +2526,11 @@ function renderClock(){
     +'<div class="clock-status"><div class="clock-dot off" id="clock-dot"></div><span id="clock-status-txt">Checking…</span></div>'
     +'<div class="clock-btns"><button class="btn-cin" id="btn-cin" onclick="clockIn()">⏱ Clock In</button><button class="btn-cout" id="btn-cout" onclick="clockOut()" style="display:none">⏹ Clock Out</button></div>'
     +'</div>'
-    +'<div class="sec-lbl">My sessions today</div>'
+    +'<div class="sec-lbl">'+t('my_sessions')+'</div>'
     +'<div class="card" id="my-sessions"><div class="card-body" style="color:var(--gray-400);font-size:13px;">Loading…</div></div>'
     +'</div>'
     +'<div>'
-    +(CU.role==='owner'?'<div class="sec-lbl">Team hours today</div><div class="card" id="team-sessions"><div class="empty" style="padding:1.5rem;"><p>Loading…</p></div></div>':'')
+    +(CU.role==='owner'?'<div class="sec-lbl">'+t('team_hours')+'</div><div class="card" id="team-sessions"><div class="empty" style="padding:1.5rem;"><p>Loading…</p></div></div>':'')
     +'</div>'
     +'</div>';
 
@@ -2578,8 +2646,8 @@ function renderTeam(){
   }).join('');
 
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Team</h2><p>All team members and their roles.</p></div>'
-    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    '<div class="page-hdr"><h2>'+t('team_title')+'</h2><p>'+t('team_sub')+'</p></div>'
+    +'<div class="card"><div class="tbl-wrap"><table><thead><tr><th>'+t('name_c')+'</th><th>'+t('email_c')+'</th><th>'+t('role_c')+'</th><th>'+t('status_c')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 
   // Load real presence
   db.collection('presence').get().then(function(snap){
@@ -2600,7 +2668,7 @@ function renderTeam(){
 function renderAdmin(){
   if(CU.role!=='owner'){document.getElementById('content').innerHTML='<div class="empty"><div class="empty-ico">🔒</div><p>Access denied</p></div>';return;}
   document.getElementById('content').innerHTML=
-    '<div class="page-hdr"><h2>Admin Panel</h2><p>Control everything from here — owners only.</p></div>'
+    '<div class="page-hdr"><h2>'+t('admin_title')+'</h2><p>'+t('admin_sub')+'</p></div>'
     +'<div class="admin-grid">'
     +'<div class="admin-card" onclick="adminRestaurants()"><div class="admin-card-ico">🏪</div><div class="admin-card-title">Manage Restaurants</div><div class="admin-card-desc">View, edit or delete any restaurant</div></div>'
     +'<div class="admin-card" onclick="adminBrands()"><div class="admin-card-ico">🍔</div><div class="admin-card-title">Manage Brands</div><div class="admin-card-desc">Add, rename or remove virtual brands</div></div>'
@@ -3562,14 +3630,15 @@ function notifyLead(l,next){
   var msg,to,type;
   if(next==='viewed'){
     msg='\uD83D\uDC40 '+who+' opened the agreement';
-    to=[l.submittedBy]; type='new';
+    type='new';
   }else if(next==='pending_approval'){
-    msg='\u270D\uFE0F '+who+' signed the agreement - tablet and setup can start';
-    to=[l.submittedBy,'Nadir','Saber','Simo']; type='new';
+    msg='\u270D\uFE0F '+who+' signed - waiting for approval';
+    type='new';
   }else{
     msg='\u274C '+who+' declined the agreement';
-    to=[l.submittedBy,'Nadir','Simo']; type='system';
+    type='system';
   }
+  to=audienceFor(next, l.submittedBy);
   if(next==='pending_approval'&&typeof sendEmail==='function'){
     sendEmail('SIGNED: '+who, l.submittedBy||'BranChef',
       who+' signed the agreement. Owner: '+(l.ownerName||'')
@@ -3601,7 +3670,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090405';
+  var CURRENT = '2026090406';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
