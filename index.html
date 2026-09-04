@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090406">
+<meta name="bc-version" content="2026090407">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2139,10 +2139,51 @@ function doRejectLead2(id, reason){
 
 
 function markShipped(id,name){
-  db.collection('tablets').doc(id).update({status:'shipped'}).then(function(){
-    addNotif('tablet','📦 Tablet shipped to '+name);
+  db.collection('tablets').doc(id).update({
+    status:'shipped', shippedBy:CU.name,
+    shippedAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    handOffToSaber(name,'Tablet shipped by '+CU.name);
     showToast('📦 Marked as shipped!');
-  });
+  }).catch(function(e){ showToast('Could not update: '+(e.message||e)); });
+}
+
+// Shipping the tablet is step 1 of onboarding, so the restaurant has to exist in
+// the pipeline and sit on Saber's next step. Called from markShipped and from
+// anywhere else that completes the shipment.
+function handOffToSaber(name, note){
+  var key=(name||'').toLowerCase().trim();
+  var lead=leads.filter(function(l){ return (l.restaurantName||'').toLowerCase().trim()===key; })[0]||{};
+  var rest=restaurants.filter(function(r){ return (r.name||'').toLowerCase().trim()===key; })[0];
+
+  if(lead.id) db.collection('leads').doc(lead.id).update({status:'shipped'}).catch(function(){});
+
+  if(rest){
+    if((rest.stepIndex||0)<1){
+      var notes=rest.stepNotes||{}; notes[0]=note;
+      db.collection('restaurants').doc(rest.id)
+        .update({stepIndex:1, stepNotes:notes, agent:rest.agent||'Saber'}).catch(function(){});
+    }
+  }else{
+    db.collection('restaurants').add({
+      name:name, address:lead.address||'', ownerName:lead.ownerName||'',
+      phone:lead.phone||'', email:lead.ownerEmail||'',
+      brands:lead.brands||[], platforms:['Uber Eats'],
+      agent:'Saber', notes:lead.notes||'',
+      status:'new', stepIndex:1, stepNotes:{0:note},
+      submittedBy:lead.submittedBy||CU.name,
+      fromLead:lead.id||null,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+  }
+
+  notifyStage(lead, 'shipped', name);
+  if(typeof sendEmail==='function')
+    sendEmail('SABER - start setup: '+name, CU.name,
+      name+' has its tablet. Create the stores on Uber Eats and DoorDash. '
+      +'Owner: '+(lead.ownerName||'')+' | '+(lead.phone||'')
+      +' | Address: '+(lead.address||'')
+      +' | Brands: '+((lead.brands||[]).join(', ')||'-'));
 }
 
 // ==========================================
@@ -3670,7 +3711,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090406';
+  var CURRENT = '2026090407';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
