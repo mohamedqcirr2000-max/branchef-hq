@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>BranChef</title>
-<meta name="bc-version" content="2026090404">
+<meta name="bc-version" content="2026090405">
 <link rel="icon" type="image/jpeg" href="/logo.jpg">
 <meta name="theme-color" content="#9B59FF">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1830,14 +1830,24 @@ function renderLeadsOwner(){
       +'</div></div>';
   }).join('') : '<div class="card" style="margin-bottom:16px;"><div class="card-body" style="color:var(--gray-400);font-size:13px;">'+t('appr_none')+' 🎉</div></div>';
 
-  var scMap = {pending:'⏳ Sent',pending_approval:'📋 Signed — awaiting you',signed:'✍️ Signed',approved:'✅ Approved',rejected:'❌ Rejected'};
+  var scMap = {sending:'… Sending',send_failed:'⚠️ Did not send',pending:'⏳ Sent',viewed:'👀 Opened',
+               pending_approval:'📋 Signed — awaiting you',signed:'✍️ Signed',approved:'✅ Approved',
+               shipped:'📦 Tablet shipped',live:'🚀 Live',rejected:'❌ Rejected'};
+  var scCol  = {sending:'#807E8C',send_failed:'#DC2626',pending:'#B45309',viewed:'#2563EB',
+                pending_approval:'#1D4ED8',signed:'#1D4ED8',approved:'#1D4ED8',
+                shipped:'#7C3AED',live:'#15803D',rejected:'#DC2626'};
   var histRows = all.map(function(l){
+    var nm=esc(l.restaurantName||'').replace(/'/g,'');
     return '<tr>'
       +'<td><strong>'+esc(l.restaurantName)+'</strong><div style="font-size:11px;color:#aaa;">'+esc(l.submittedBy)+'</div></td>'
       +'<td style="font-size:12px;">'+esc(l.ownerName)+'<br><span style="color:#aaa;">'+esc(l.ownerEmail)+'</span></td>'
-      +'<td>'+(scMap[l.status]||l.status)+'</td>'
+      +'<td style="font-weight:700;color:'+(scCol[l.status]||'#666')+';">'+(scMap[l.status]||esc(l.status||''))
+        +(l.statusSetBy?'<div style="font-size:10px;font-weight:500;color:#aaa;">set by '+esc(l.statusSetBy)+'</div>':'')+'</td>'
       +'<td style="font-size:11px;color:#aaa;">'+timeAgo(l.createdAt)+'</td>'
-      +'<td><button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="softDelete(\'leads\',\''+l.id+'\',\''+esc(l.restaurantName)+'\')">Delete</button></td>'
+      +'<td style="white-space:nowrap;">'
+        +'<button class="btn btn-ghost" style="padding:4px 9px;font-size:11px;margin-right:5px;" onclick="editLeadStatus(\''+l.id+'\',\''+nm+'\')">Change stage</button>'
+        +'<button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="softDelete(\'leads\',\''+l.id+'\',\''+nm+'\')">Delete</button>'
+      +'</td>'
       +'</tr>';
   }).join('');
 
@@ -1856,6 +1866,7 @@ function renderLeadsSales(){
            viewed:'👀 Opened the agreement',
            pending:t('st_sent'), pending_approval:t('st_signed'), signed:t('st_signed'),
            approved:t('st_signed'), shipped:t('st_shipped'), live:t('st_live'), rejected:t('st_rejected') };
+  // Nadir can set any stage by hand from Signed contracts; show it the same way.
   var cc={ sending:'#807E8C', send_failed:'#DC2626', viewed:'#2563EB',
            pending:'#B45309', pending_approval:'#B45309', signed:'#1D4ED8',
            approved:'#1D4ED8', shipped:'#7C3AED', live:'#15803D', rejected:'#DC2626' };
@@ -1968,6 +1979,45 @@ function submitLead(){
     btn.disabled=false; btn.textContent=t('send_join');
   });
 }
+// Nadir can override any restaurant's stage by hand - the automatic sync only
+// ever moves a lead forward from 'sending', 'pending' or 'viewed', so anything
+// set here is left alone afterwards.
+var LEAD_STAGES=[
+  {v:'pending',          t:'Agreement sent - waiting for signature'},
+  {v:'viewed',           t:'Owner opened the agreement'},
+  {v:'pending_approval', t:'Signed - waiting for your approval'},
+  {v:'approved',         t:'Approved - tablet can ship'},
+  {v:'shipped',          t:'Tablet shipped'},
+  {v:'live',             t:'Live (green)'},
+  {v:'rejected',         t:'Rejected'},
+  {v:'send_failed',      t:'Agreement failed to send'}
+];
+
+function editLeadStatus(id,name){
+  if(CU.role!=='owner'){ showToast(t('owners_only')); return; }
+  var l=leads.filter(function(x){return x.id===id;})[0]||{};
+  uiAsk({
+    title:'Set the stage', sub:name, ok:t('save'),
+    fields:[{id:'st',label:t('status_c'),value:l.status||'pending',options:LEAD_STAGES}]
+  }).then(function(v){
+    if(!v)return;
+    var upd={status:v.st, statusSetBy:CU.name, statusSetAt:firebase.firestore.FieldValue.serverTimestamp()};
+    if(v.st!=='rejected') upd.rejectReason=firebase.firestore.FieldValue.delete();
+    db.collection('leads').doc(id).update(upd).then(function(){
+      var label=(LEAD_STAGES.filter(function(x){return x.v===v.st;})[0]||{}).t||v.st;
+      var ref=db.collection('notifications').doc();
+      ref.set({
+        type:'new', message:CU.name+' set '+name+' to: '+label,
+        to:[l.submittedBy,'Nadir','Saber','Simo'].filter(Boolean),
+        read:false, createdBy:CU.name,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(){});
+      showToast('Stage updated');
+      renderLeads();
+    }).catch(function(e){ showToast('Could not update: '+(e.message||e)); });
+  });
+}
+
 function doApproveLead(btn){
   var id   = btn.getAttribute('data-lid');
   var name = btn.getAttribute('data-lname');
@@ -3418,7 +3468,11 @@ function uiAsk(o){
     document.getElementById('ask-fields').innerHTML = f.length
       ? f.map(function(x){
           return '<div class="field"><label>'+esc(x.label||'')+'</label>'
-            +(x.multiline
+            +(x.options
+              ? '<select id="ask-f-'+x.id+'">'+x.options.map(function(o){
+                  return '<option value="'+esc(o.v)+'"'+(o.v===x.value?' selected':'')+'>'+esc(o.t)+'</option>';
+                }).join('')+'</select>'
+              : x.multiline
               ? '<textarea id="ask-f-'+x.id+'" placeholder="'+esc(x.placeholder||'')+'">'+esc(x.value||'')+'</textarea>'
               : '<input id="ask-f-'+x.id+'" type="'+(x.type||'text')+'" value="'+esc(x.value||'')+'" placeholder="'+esc(x.placeholder||'')+'">')
             +'</div>';
@@ -3435,7 +3489,7 @@ function uiAsk(o){
 function uiClose(ok){
   var res=_askResolve; _askResolve=null;
   var vals={};
-  document.querySelectorAll('#ask-fields [id^="ask-f-"]').forEach(function(el){
+  document.querySelectorAll('#ask-fields input,#ask-fields textarea,#ask-fields select').forEach(function(el){
     vals[el.id.replace('ask-f-','')]=el.value.trim();
   });
   closeModal('modal-ask');
@@ -3547,7 +3601,7 @@ function startSync(){
 <script>
 // Auto-reload when a new version is deployed
 (function(){
-  var CURRENT = '2026090404';
+  var CURRENT = '2026090405';
   function checkVersion(){
     fetch(window.location.href + '?v=' + Date.now(), {cache:'no-store'})
       .then(function(r){return r.text();})
